@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { putImage, deleteImageFromDB } from '../utils/db'
 
@@ -6,6 +6,7 @@ const ProjectContext = createContext(null)
 
 export function ProjectProvider({ children }) {
   const [projects, setProjects] = useLocalStorage('sd-projects', [])
+  const [history, setHistory] = useState([]) // 操作历史记录
 
   // One-time migration: move in-memory image URLs/files to IndexedDB and strip non-serializable fields
   useEffect(() => {
@@ -109,6 +110,20 @@ export function ProjectProvider({ children }) {
 
   // Update image prompt
   const updateImagePrompt = (projectId, imageId, prompt) => {
+    // 记录旧值用于撤销
+    const project = projects.find(p => p.id === projectId)
+    const image = project?.images.find(img => img.id === imageId)
+    if (image) {
+      setHistory(prev => [...prev, {
+        type: 'UPDATE_PROMPT',
+        projectId,
+        imageId,
+        oldPrompt: image.prompt,
+        newPrompt: prompt,
+        timestamp: Date.now()
+      }])
+    }
+
     setProjects(prev =>
       prev.map(p =>
         p.id === projectId
@@ -125,7 +140,20 @@ export function ProjectProvider({ children }) {
 
   // Delete image from project (and from IndexedDB)
   const deleteImage = (projectId, imageId) => {
-    deleteImageFromDB(imageId).catch(() => {})
+    // 记录被删除的图片用于撤销
+    const project = projects.find(p => p.id === projectId)
+    const image = project?.images.find(img => img.id === imageId)
+    if (image) {
+      setHistory(prev => [...prev, {
+        type: 'DELETE_IMAGE',
+        projectId,
+        image: { ...image },
+        imageIndex: project.images.findIndex(img => img.id === imageId),
+        timestamp: Date.now()
+      }])
+    }
+
+    // 注意：不立即删除 IndexedDB 中的图片，等待可能的撤销
     setProjects(prev =>
       prev.map(p => {
         if (p.id === projectId) {
@@ -134,6 +162,46 @@ export function ProjectProvider({ children }) {
         return p
       })
     )
+  }
+
+  // 撤销上一步操作
+  const undo = () => {
+    if (history.length === 0) return
+
+    const lastAction = history[history.length - 1]
+    
+    if (lastAction.type === 'UPDATE_PROMPT') {
+      // 恢复旧的 prompt
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === lastAction.projectId
+            ? {
+                ...p,
+                images: p.images.map(img =>
+                  img.id === lastAction.imageId 
+                    ? { ...img, prompt: lastAction.oldPrompt } 
+                    : img
+                )
+              }
+            : p
+        )
+      )
+    } else if (lastAction.type === 'DELETE_IMAGE') {
+      // 恢复被删除的图片
+      setProjects(prev =>
+        prev.map(p => {
+          if (p.id === lastAction.projectId) {
+            const newImages = [...p.images]
+            newImages.splice(lastAction.imageIndex, 0, lastAction.image)
+            return { ...p, images: newImages }
+          }
+          return p
+        })
+      )
+    }
+
+    // 移除最后一条历史记录
+    setHistory(prev => prev.slice(0, -1))
   }
 
   // Get project by ID
@@ -149,7 +217,9 @@ export function ProjectProvider({ children }) {
     addImageToProject,
     updateImagePrompt,
     deleteImage,
-    getProject
+    getProject,
+    undo,
+    canUndo: history.length > 0
   }
 
   return (

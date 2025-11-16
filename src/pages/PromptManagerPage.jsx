@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '../contexts/ProjectContext'
 import { ImageCard } from '../components/ImageCard'
@@ -13,10 +13,25 @@ export function PromptManagerPage() {
     getProject,
     addImageToProject,
     updateImagePrompt,
-    deleteImage
+    deleteImage,
+    undo,
+    canUndo
   } = useProjects()
 
   const project = getProject(projectId)
+
+  // Ctrl+Z 撤销快捷键
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && canUndo) {
+        e.preventDefault()
+        undo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [undo, canUndo])
 
   if (!project) {
     return (
@@ -66,6 +81,16 @@ export function PromptManagerPage() {
             <p className="page-header__subtitle">{project.description}</p>
           )}
         </div>
+
+        <Button
+          variant="ghost"
+          size="small"
+          onClick={undo}
+          disabled={!canUndo}
+          title="撤销上一步操作 (Ctrl+Z)"
+        >
+          ↶ 撤销
+        </Button>
 
         <label htmlFor="image-upload" className="btn btn--primary btn--medium upload-label">
           📁 上传图片

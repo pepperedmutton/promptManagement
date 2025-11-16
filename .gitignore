@@ -1,3 +1,21 @@
 node_modules/
 dist/
 .env
+
+# Local data and user files
+*.local
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# User data (if you ever add file exports)
+/exports/
+/backups/
+/user-data/
