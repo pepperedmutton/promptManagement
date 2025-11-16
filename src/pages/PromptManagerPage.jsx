@@ -177,6 +177,7 @@ export function PromptManagerPage() {
               <ImageCard
                 key={image.id}
                 image={image}
+                projectId={projectId}
                 onPromptChange={handlePromptChange}
                 onDelete={handleDeleteImage}
               />

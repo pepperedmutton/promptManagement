@@ -4,7 +4,7 @@ echo ========================================
 echo   Stable Diffusion Prompt 管理工具
 echo ========================================
 echo.
-echo 正在启动开发服务器...
+echo 正在启动服务...
 echo.
 
 cd /d "%~dp0"
@@ -25,9 +25,15 @@ if not exist "node_modules\" (
     echo.
 )
 
-:: 启动开发服务器
-echo [启动] 正在启动 Vite 开发服务器...
+:: 同时启动后端服务器和前端开发服务器
+echo [启动] 正在启动后端服务器和前端开发服务器...
 echo.
-call npm run dev
+echo ----------------------------------------
+echo 后端服务器: http://localhost:3001
+echo 前端界面:   http://localhost:5173
+echo 数据目录:   %CD%\data
+echo ----------------------------------------
+echo.
+call npm start
 
 pause

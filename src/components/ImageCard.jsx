@@ -1,11 +1,14 @@
 import React, { useState } from 'react'
 import './ImageCard.css'
-import { useImageURL } from '../hooks/useImageURL'
+import { useProjects } from '../contexts/ProjectContext'
 
-export function ImageCard({ image, onPromptChange, onDelete }) {
-  const { url, loading } = useImageURL(image.id)
+export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
+  const { getImageUrl } = useProjects()
   const [copySuccess, setCopySuccess] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [imageError, setImageError] = useState(false)
+
+  const imageUrl = getImageUrl(projectId, image.filename)
 
   const handleCopyPrompt = async () => {
     if (!image.prompt) return
@@ -44,12 +47,15 @@ export function ImageCard({ image, onPromptChange, onDelete }) {
   return (
     <div className="image-card">
       <div className="image-card__wrapper">
-        {loading ? (
-          <div className="image-card__placeholder">加载中...</div>
-        ) : url ? (
-          <img src={url} alt="Uploaded" className="image-card__img" />
+        {imageError ? (
+          <div className="image-card__placeholder">加载失败</div>
         ) : (
-          <div className="image-card__placeholder">未找到图片</div>
+          <img 
+            src={imageUrl} 
+            alt="Uploaded" 
+            className="image-card__img"
+            onError={() => setImageError(true)}
+          />
         )}
         
         {/* 左上角三点菜单 */}

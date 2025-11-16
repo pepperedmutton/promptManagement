@@ -2,6 +2,9 @@ node_modules/
 dist/
 .env
 
+# Data directory (user files)
+/data/
+
 # Local data and user files
 *.local
 .DS_Store
