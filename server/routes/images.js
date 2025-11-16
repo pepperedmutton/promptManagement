@@ -9,7 +9,7 @@ const { broadcast } = require('../services/websocket');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 从 PNG 提取元数据
+// 尝试从 PNG 中提取 metadata（主要用于 prompt）
 function extractPNGMetadata(buffer) {
   try {
     const png = PNG.sync.read(buffer);
@@ -43,18 +43,15 @@ router.post('/:projectId', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: '项目未绑定文件夹' });
     }
     
-    // 生成唯一文件名
     const timestamp = Date.now();
     const ext = path.extname(file.originalname) || '.png';
     const imageId = `${timestamp}`;
     const filename = `${imageId}${ext}`;
     const imagePath = path.join(project.folderPath, filename);
     
-    // 1. 先写入图片文件
     await fs.writeFile(imagePath, file.buffer);
-    console.log(`✓ 图片已保存: ${filename}`);
+    console.log(`📸 图片已保存 ${filename}`);
     
-    // 2. 提取并保存 prompt
     let prompt = req.body.prompt || '';
     if (!prompt && ext.toLowerCase() === '.png') {
       const metadata = extractPNGMetadata(file.buffer);
@@ -66,10 +63,10 @@ router.post('/:projectId', upload.single('image'), async (req, res) => {
     if (prompt) {
       const promptPath = path.join(project.folderPath, `${imageId}.txt`);
       await fs.writeFile(promptPath, prompt, 'utf-8');
-      console.log(`✓ Prompt 已保存: ${imageId}.txt`);
+      console.log(`📝 Prompt 已保存 ${imageId}.txt`);
     }
     
-    // 3. 返回立即响应，让文件监听器处理同步
+    const now = new Date().toISOString();
     res.json({
       success: true,
       image: {
@@ -77,17 +74,17 @@ router.post('/:projectId', upload.single('image'), async (req, res) => {
         filename,
         mime: file.mimetype,
         prompt,
-        addedAt: new Date().toISOString()
+        addedAt: now,
+        updatedAt: now
       }
     });
-    
   } catch (error) {
     console.error('添加图片失败:', error);
     res.status(500).json({ error: '添加图片失败' });
   }
 });
 
-// PUT /api/images/:projectId/:imageId - 更新图片 prompt
+// PUT /api/images/:projectId/:imageId - 更新 prompt
 router.put('/:projectId/:imageId', async (req, res) => {
   try {
     const { projectId, imageId } = req.params;
@@ -104,14 +101,11 @@ router.put('/:projectId/:imageId', async (req, res) => {
       return res.status(400).json({ error: '项目未绑定文件夹' });
     }
     
-    // 1. 先写入 prompt 文件
     const promptPath = path.join(project.folderPath, `${imageId}.txt`);
     await fs.writeFile(promptPath, prompt || '', 'utf-8');
-    console.log(`✓ Prompt 已更新: ${imageId}.txt`);
+    console.log(`📝 Prompt 已更新 ${imageId}.txt`);
     
-    // 2. 返回立即响应，让文件监听器处理同步
     res.json({ success: true });
-    
   } catch (error) {
     console.error('更新 prompt 失败:', error);
     res.status(500).json({ error: '更新 prompt 失败' });
@@ -139,20 +133,57 @@ router.delete('/:projectId/:imageId', async (req, res) => {
       return res.status(404).json({ error: '图片不存在' });
     }
     
-    // 1. 先删除文件
     const imagePath = path.join(project.folderPath, image.filename);
     const promptPath = path.join(project.folderPath, `${imageId}.txt`);
     
     await fs.unlink(imagePath).catch(() => {});
     await fs.unlink(promptPath).catch(() => {});
-    console.log(`✓ 图片已删除: ${image.filename}`);
+    console.log(`🗑️ 图片已删除 ${image.filename}`);
     
-    // 2. 返回立即响应，让文件监听器处理同步
     res.json({ success: true });
-    
   } catch (error) {
     console.error('删除图片失败:', error);
     res.status(500).json({ error: '删除图片失败' });
+  }
+});
+
+// PUT /api/images/:projectId/:imageId/mosaic - 保存马赛克结果
+router.put('/:projectId/:imageId/mosaic', upload.single('image'), async (req, res) => {
+  try {
+    const { projectId, imageId } = req.params;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: '没有收到更新后的图片' });
+    }
+    
+    const projects = await loadProjects();
+    const project = projects.find(p => p.id === projectId);
+    
+    if (!project) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    if (!project.folderPath) {
+      return res.status(400).json({ error: '项目未绑定文件夹' });
+    }
+    
+    const image = project.images.find(img => img.id === imageId);
+    if (!image) {
+      return res.status(404).json({ error: '图片不存在' });
+    }
+    
+    const imagePath = path.join(project.folderPath, image.filename);
+    await fs.writeFile(imagePath, file.buffer);
+    
+    image.updatedAt = new Date().toISOString();
+    await saveProjects(projects);
+    
+    broadcast({ type: 'projects-updated' });
+    res.json({ success: true, updatedAt: image.updatedAt });
+  } catch (error) {
+    console.error('保存马赛克图片失败:', error);
+    res.status(500).json({ error: '保存马赛克图片失败' });
   }
 });
 
@@ -175,7 +206,6 @@ router.get('/:projectId/:imageId/file', async (req, res) => {
     
     const imagePath = path.join(project.folderPath, image.filename);
     res.sendFile(imagePath);
-    
   } catch (error) {
     console.error('获取图片失败:', error);
     res.status(500).json({ error: '获取图片失败' });

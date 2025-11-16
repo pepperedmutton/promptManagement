@@ -1,0 +1,229 @@
+.mosaic-editor {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f13;
+  color: #fff;
+  padding: 1.5rem 2rem;
+  gap: 1.5rem;
+}
+
+.mosaic-editor__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.mosaic-editor__title-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.mosaic-editor__title-group h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.mosaic-editor__title-group p {
+  margin: 0.25rem 0 0;
+  color: #a0a0b2;
+  font-size: 0.95rem;
+}
+
+.mosaic-editor__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.mosaic-editor__content {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.mosaic-editor__workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #161620;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.mosaic-editor__controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.mosaic-editor__slider-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #d5d5e6;
+}
+
+.mosaic-editor__slider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mosaic-editor__slider input[type="range"] {
+  width: 220px;
+}
+
+.mosaic-editor__slider span {
+  min-width: 48px;
+  text-align: right;
+  color: #c0c0d5;
+  font-size: 0.9rem;
+}
+
+.mosaic-editor__status {
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: #dcdced;
+}
+
+.mosaic-editor__status--success {
+  background: rgba(51, 193, 120, 0.15);
+  color: #8de5b5;
+}
+
+.mosaic-editor__status--error {
+  background: rgba(255, 99, 132, 0.15);
+  color: #ff889f;
+}
+
+.mosaic-editor__canvas-wrapper {
+  flex: 1;
+  background: #0c0c15;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.mosaic-editor__canvas {
+  max-width: 100%;
+  max-height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.mosaic-editor__loading {
+  position: absolute;
+  background: rgba(15, 15, 23, 0.8);
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  backdrop-filter: blur(6px);
+}
+
+.mosaic-editor__sidebar {
+  width: 260px;
+  background: #161620;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+}
+
+.mosaic-editor__sidebar h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+  color: #f0f0ff;
+}
+
+.mosaic-editor__thumbnails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.mosaic-editor__thumbnail {
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 0.25rem;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mosaic-editor__thumbnail:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.mosaic-editor__thumbnail.is-active {
+  border-color: #8c6ff7;
+  box-shadow: 0 0 0 2px rgba(140, 111, 247, 0.3);
+}
+
+.mosaic-editor__thumbnail img {
+  width: 100%;
+  border-radius: 10px;
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
+}
+
+.mosaic-editor__thumbnail-name {
+  font-size: 0.85rem;
+  color: #d0cfe8;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mosaic-editor__empty {
+  flex: 1;
+  background: #161620;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 1rem;
+  color: #dcdceb;
+  padding: 2rem;
+}
+
+@media (max-width: 1100px) {
+  .mosaic-editor__content {
+    flex-direction: column;
+  }
+
+  .mosaic-editor__sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .mosaic-editor__thumbnails {
+    flex-direction: row;
+  }
+
+  .mosaic-editor__thumbnail {
+    min-width: 160px;
+  }
+}

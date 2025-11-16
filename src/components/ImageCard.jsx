@@ -9,7 +9,8 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
   const [imageError, setImageError] = useState(false)
 
   // 使用 previewUrl（乐观更新）或真实 URL
-  const imageUrl = image.previewUrl || getImageUrl(projectId, image.filename)
+  const imageVersion = image.updatedAt || image.addedAt || ''
+  const imageUrl = image.previewUrl || getImageUrl(projectId, image.filename, imageVersion)
 
   const handleCopyPrompt = async () => {
     if (!image.prompt) return

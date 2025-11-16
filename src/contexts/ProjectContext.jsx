@@ -86,12 +86,14 @@ export function ProjectProvider({ children }) {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     const blobUrl = URL.createObjectURL(file)
     
+    const now = new Date().toISOString()
     const tempImage = {
       id: tempId,
       filename: file.name,
       mime: file.type,
       prompt: prompt || '',
-      addedAt: new Date().toISOString(),
+      addedAt: now,
+      updatedAt: now,
       isOptimistic: true, // 标记为乐观更新
       previewUrl: blobUrl  // 临时预览 URL
     }
@@ -126,8 +128,8 @@ export function ProjectProvider({ children }) {
                         mime: response.mime,
                         prompt: response.prompt,
                         addedAt: response.addedAt,
-                        isOptimistic: false,
-                        previewUrl: undefined
+                        updatedAt: response.updatedAt,
+                        isOptimistic: false
                       }
                     : img
                 )
@@ -326,8 +328,8 @@ export function ProjectProvider({ children }) {
   }
 
   // 获取图片 URL
-  const getImageUrl = (projectId, filename) => {
-    return apiClient.getImageUrl(projectId, filename)
+  const getImageUrl = (projectId, filename, version) => {
+    return apiClient.getImageUrl(projectId, filename, version)
   }
 
   const value = {

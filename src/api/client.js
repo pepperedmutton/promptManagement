@@ -50,9 +50,9 @@ class ApiClient {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000); // 最多 30 秒
+    const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000); // 最长 30 秒
     
-    console.log(`🔄 ${delay / 1000} 秒后尝试重连... (第 ${this.reconnectAttempts} 次)`);
+    console.log(`🔄 ${delay / 1000} 秒后尝试重连... (${this.reconnectAttempts} 次)`);
     setTimeout(() => this.connectWebSocket(), delay);
   }
 
@@ -64,7 +64,7 @@ class ApiClient {
 
   // 打开系统文件夹选择对话框
   async selectFolder() {
-    console.log('发送文件夹选择请求到:', `${API_BASE}/select-folder`);
+    console.log('发送文件夹选择请求到', `${API_BASE}/select-folder`);
     try {
       const response = await fetch(`${API_BASE}/select-folder`, {
         method: 'POST'
@@ -165,9 +165,24 @@ class ApiClient {
     return response.json();
   }
 
-  // 获取图片 URL
-  getImageUrl(projectId, filename) {
-    return `http://localhost:3001/images/${projectId}/${filename}`;
+  // 保存马赛克编辑后的图片
+  async saveMosaicImage(projectId, imageId, blob, filename = 'mosaic.png') {
+    const formData = new FormData();
+    formData.append('image', blob, filename);
+
+    const response = await fetch(`${API_BASE}/images/${projectId}/${imageId}/mosaic`, {
+      method: 'PUT',
+      body: formData
+    });
+
+    if (!response.ok) throw new Error('保存马赛克图片失败');
+    return response.json();
+  }
+
+  // 获取图片 URL（支持 cache busting）
+  getImageUrl(projectId, filename, version = '') {
+    const cacheBuster = version ? `?v=${encodeURIComponent(version)}` : '';
+    return `http://localhost:3001/images/${projectId}/${filename}${cacheBuster}`;
   }
 }
 

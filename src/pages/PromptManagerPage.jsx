@@ -135,6 +135,12 @@ export function PromptManagerPage() {
     deleteImage(projectId, imageId)
   }
 
+  const handleOpenMosaic = () => {
+    if (!project || project.images.length === 0) return
+    const targetImageId = project.images[0].id
+    navigate(`/projects/${projectId}/mosaic/${targetImageId}`)
+  }
+
   return (
     <div className="prompt-manager-page">
       <header className="page-header">
@@ -161,6 +167,15 @@ export function PromptManagerPage() {
           title="撤销上一步操作 (Ctrl+Z)"
         >
           ↶ 撤销
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="small"
+          onClick={handleOpenMosaic}
+          disabled={project.images.length === 0}
+        >
+          🧩 马赛克模式
         </Button>
 
         <label htmlFor="image-upload" className="btn btn--primary btn--medium upload-label">

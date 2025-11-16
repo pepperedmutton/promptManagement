@@ -37,7 +37,8 @@ async function scanProjectFolder(project) {
         filename: file,
         mime: `image/${path.extname(file).slice(1)}`,
         prompt,
-        addedAt: stat.birthtime.toISOString()
+        addedAt: stat.birthtime.toISOString(),
+        updatedAt: stat.mtime.toISOString()
       });
     }
     
@@ -154,7 +155,8 @@ async function performSync() {
             filename: file,
             mime: `image/${path.extname(file).slice(1)}`,
             prompt,
-            addedAt: stat.birthtime.toISOString()
+            addedAt: stat.birthtime.toISOString(),
+            updatedAt: stat.mtime.toISOString()
           });
           
           hasChanges = true;
@@ -177,9 +179,22 @@ async function performSync() {
         console.log(`✓ 移除已删除的图片: ${imagesToRemove.length} 个`);
       }
       
-      // 更新 prompt
+      // 更新 prompt 及图片元数据
       for (const image of project.images) {
         const promptFile = path.join(project.folderPath, `${image.id}.txt`);
+        const imagePath = path.join(project.folderPath, image.filename);
+
+        try {
+          const stat = await fs.stat(imagePath);
+          const updatedAt = stat.mtime.toISOString();
+          if (image.updatedAt !== updatedAt) {
+            image.updatedAt = updatedAt;
+            hasChanges = true;
+          }
+        } catch {
+          // 文件可能暂时不可访问，交给后续删除流程处�?
+        }
+
         try {
           const prompt = await fs.readFile(promptFile, 'utf-8');
           if (image.prompt !== prompt) {

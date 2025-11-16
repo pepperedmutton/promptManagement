@@ -88,3 +88,13 @@ WebSocket 广播更新
 ---
 
 现在的架构更加健壮，完全以本地文件系统为准！
+
+## 🧩 马赛克编辑器工作流
+
+1. 前端进入新的 `/projects/:projectId/mosaic/:imageId?` 路由，使用 `<canvas>` 渲染真实图片。
+2. 用户在画布上拖拽时，只修改前端内存中的像素，不会立即写回文件，避免频繁 IO。
+3. 点击 “保存马赛克” 后，通过 `PUT /api/images/:projectId/:imageId/mosaic` 上传合成后的 PNG。
+4. 后端直接覆盖原始图片文件，并写入 `updatedAt` 时间戳，随后广播 `projects-updated`。
+5. 文件监听器捕捉到变更会再次校准 `projects.json`，前端使用 `?v=updatedAt` cache busting 即刻看到最新图片。
+
+> 还原按钮仅在前端执行，将 `canvas` 恢复为进入编辑器时的初始位图，不触发任何后端请求。
