@@ -6,9 +6,11 @@ const { loadProjects, saveProjects } = require('../services/storage');
 const router = express.Router();
 
 // POST /api/select-folder - 选择文件夹
-router.post('/', async (req, res) => {
+router.post('/select-folder', async (req, res) => {
   try {
     const vbsPath = path.join(__dirname, '../../select-folder.vbs');
+    
+    console.log('VBS 路径:', vbsPath);
     
     const vbsProcess = spawn('cscript.exe', ['//NoLogo', vbsPath], {
       cwd: path.dirname(vbsPath)
@@ -26,6 +28,9 @@ router.post('/', async (req, res) => {
     
     vbsProcess.on('close', (code) => {
       const folderPath = output.trim();
+      
+      console.log('VBS 退出码:', code);
+      console.log('VBS 输出:', folderPath);
       
       if (code === 0 && folderPath && folderPath !== 'CANCELLED') {
         res.json({ folderPath });

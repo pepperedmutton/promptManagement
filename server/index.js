@@ -45,7 +45,7 @@ app.get('/images/:projectId/:filename', async (req, res) => {
 // API 路由挂载
 app.use('/api/projects', projectsRouter);
 app.use('/api/images', imagesRouter);
-app.use('/api/select-folder', foldersRouter);
+app.use('/api', foldersRouter);  // 挂载到 /api，因为 foldersRouter 内部定义了 /select-folder
 
 // 更新文件监听器的端点
 app.post('/api/update-watcher', async (req, res) => {
