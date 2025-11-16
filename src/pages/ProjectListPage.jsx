@@ -21,10 +21,10 @@ export function ProjectListPage() {
       // 调用后端 API 打开系统文件夹选择对话框
       const result = await apiClient.selectFolder()
       
-      if (result.path) {
-        setFolderPath(result.path)
+      if (result.folderPath) {
+        setFolderPath(result.folderPath)
         // 自动使用文件夹名称作为项目名称
-        const folderName = result.path.split(/[/\\]/).pop()
+        const folderName = result.folderPath.split(/[/\\]/).pop()
         setProjectName(folderName)
       }
     } catch (error) {
