@@ -1,0 +1,131 @@
+.project-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-base);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.project-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.project-card__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  flex: 1;
+  word-break: break-word;
+}
+
+.project-card__delete {
+  width: 28px;
+  height: 28px;
+  background: var(--color-gray-100);
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--color-gray-600);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.project-card__delete:hover {
+  background: var(--color-danger);
+  color: white;
+  transform: scale(1.1);
+}
+
+.project-card__description {
+  color: var(--color-gray-600);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.project-card__stats {
+  display: flex;
+  gap: var(--spacing-lg);
+}
+
+.project-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.project-card__stat-label {
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.project-card__stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.project-card__preview {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-gray-100);
+  min-height: 120px;
+}
+
+.project-card__images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  height: 120px;
+}
+
+.project-card__image {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-gray-200);
+}
+
+.project-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-card__image--more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-gray-300);
+  color: var(--color-gray-700);
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.project-card__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  color: var(--color-gray-400);
+}
+
+.project-card__footer {
+  margin-top: auto;
+}

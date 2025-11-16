@@ -1,0 +1,118 @@
+.prompt-manager-page {
+  min-height: 100vh;
+  padding: var(--spacing-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-2xl);
+  flex-wrap: wrap;
+}
+
+.page-header__content {
+  flex: 1;
+  min-width: 250px;
+}
+
+.page-header__title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: white;
+  margin-bottom: var(--spacing-xs);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.page-header__subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.upload-label {
+  cursor: pointer;
+}
+
+.prompt-manager-page__content {
+  animation: fadeIn var(--transition-base);
+}
+
+.image-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: var(--spacing-2xl);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(10px);
+}
+
+.empty-state__icon {
+  font-size: 4rem;
+  margin-bottom: var(--spacing-lg);
+}
+
+.empty-state__title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: var(--spacing-md);
+}
+
+.empty-state__description {
+  font-size: 1.125rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: var(--spacing-xl);
+  max-width: 500px;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  text-align: center;
+  gap: var(--spacing-lg);
+}
+
+.error-state h2 {
+  font-size: 2rem;
+  color: white;
+}
+
+.error-state p {
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .prompt-manager-page {
+    padding: var(--spacing-md);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header__title {
+    font-size: 1.5rem;
+  }
+
+  .image-gallery {
+    grid-template-columns: 1fr;
+  }
+}
