@@ -73,8 +73,26 @@
 .empty-state__description {
   font-size: 1.125rem;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
   max-width: 500px;
+}
+
+.empty-state__hint {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.empty-state__hint kbd {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .error-state {

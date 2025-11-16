@@ -106,6 +106,8 @@ export function ProjectProvider({ children }) {
           : p
       )
     )
+    
+    return imageId // 返回 imageId 供后续使用
   }
 
   // Update image prompt
