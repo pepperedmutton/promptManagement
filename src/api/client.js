@@ -64,14 +64,26 @@ class ApiClient {
 
   // 打开系统文件夹选择对话框
   async selectFolder() {
-    const response = await fetch(`${API_BASE}/select-folder`, {
-      method: 'POST'
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || '打开文件夹选择器失败');
+    console.log('发送文件夹选择请求到:', `${API_BASE}/select-folder`);
+    try {
+      const response = await fetch(`${API_BASE}/select-folder`, {
+        method: 'POST'
+      });
+      console.log('收到响应:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('请求失败:', error);
+        throw new Error(error.error || '打开文件夹选择器失败');
+      }
+      
+      const result = await response.json();
+      console.log('选择结果:', result);
+      return result;
+    } catch (error) {
+      console.error('selectFolder 错误:', error);
+      throw error;
     }
-    return response.json();
   }
 
   // 获取所有项目

@@ -27,9 +27,10 @@
 - **React 18** — 现代化 UI 框架
 - **React Router v7** — 客户端路由
 - **Vite 5** — 快速开发服务器和构建工具
-- **Node.js + Express** — 后端服务器
-- **Chokidar** — 文件系统监听
-- **WebSocket** — 实时数据同步
+- **Node.js + Express** — 模块化后端服务器
+- **Chokidar** — 文件系统监听（100ms 轮询优化）
+- **WebSocket** — 实时数据同步（指数退避重连）
+- **pngjs** — PNG 元数据提取
 
 ### 项目结构
 
