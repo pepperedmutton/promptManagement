@@ -6,6 +6,9 @@ const fsSync = require('fs');
 const chokidar = require('chokidar');
 const WebSocket = require('ws');
 const http = require('http');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 const app = express();
 const PORT = 3001;
@@ -78,6 +81,38 @@ async function saveProjects(projects) {
 }
 
 // API 路由
+
+// 打开文件夹选择对话框（Windows PowerShell）
+app.get('/api/select-folder', async (req, res) => {
+  try {
+    // 使用 PowerShell 打开文件夹选择对话框
+    const psScript = `
+      Add-Type -AssemblyName System.Windows.Forms
+      $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+      $folderBrowser.Description = '选择包含图片的文件夹'
+      $folderBrowser.ShowNewFolderButton = $false
+      $result = $folderBrowser.ShowDialog()
+      if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+        Write-Output $folderBrowser.SelectedPath
+      }
+    `;
+    
+    const { stdout, stderr } = await execPromise(
+      `powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`
+    );
+    
+    const selectedPath = stdout.trim();
+    
+    if (selectedPath) {
+      res.json({ path: selectedPath });
+    } else {
+      res.status(400).json({ error: '未选择文件夹' });
+    }
+  } catch (error) {
+    console.error('打开文件夹选择器失败:', error);
+    res.status(500).json({ error: '打开文件夹选择器失败' });
+  }
+});
 
 // 获取所有项目
 app.get('/api/projects', async (req, res) => {

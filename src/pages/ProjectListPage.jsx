@@ -3,6 +3,7 @@ import { useProjects } from '../contexts/ProjectContext'
 import { ProjectCard } from '../components/ProjectCard'
 import { Modal } from '../components/Modal'
 import { Button } from '../components/Button'
+import { apiClient } from '../api/client'
 import './ProjectListPage.css'
 
 export function ProjectListPage() {
@@ -10,6 +11,29 @@ export function ProjectListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [folderPath, setFolderPath] = useState('')
   const [projectName, setProjectName] = useState('')
+  const [isSelecting, setIsSelecting] = useState(false)
+
+  // 使用系统文件夹选择器
+  const handleSelectFolder = async () => {
+    try {
+      setIsSelecting(true)
+      
+      // 调用后端 API 打开系统文件夹选择对话框
+      const result = await apiClient.selectFolder()
+      
+      if (result.path) {
+        setFolderPath(result.path)
+        // 自动使用文件夹名称作为项目名称
+        const folderName = result.path.split(/[/\\]/).pop()
+        setProjectName(folderName)
+      }
+    } catch (error) {
+      console.error('选择文件夹失败:', error)
+      alert('选择文件夹失败，请手动输入路径')
+    } finally {
+      setIsSelecting(false)
+    }
+  }
 
   const handleOpenFolder = async (e) => {
     e.preventDefault()
@@ -77,6 +101,24 @@ export function ProjectListPage() {
       >
         <form onSubmit={handleOpenFolder} className="project-form">
           <div className="form-field">
+            <label className="form-label">
+              选择文件夹
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              onClick={handleSelectFolder}
+              disabled={isSelecting}
+            >
+              {isSelecting ? '正在选择...' : '🗂️ 浏览并选择文件夹'}
+            </Button>
+            <p className="form-hint">
+              💡 点击按钮选择包含图片的文件夹
+            </p>
+          </div>
+
+          <div className="form-field">
             <label htmlFor="folder-path" className="form-label">
               文件夹路径 <span className="required">*</span>
             </label>
@@ -86,13 +128,9 @@ export function ProjectListPage() {
               className="form-input"
               value={folderPath}
               onChange={(e) => setFolderPath(e.target.value)}
-              placeholder="例如：D:\SD\outputs\project1"
+              placeholder="或手动输入：D:\SD\outputs\project1"
               required
-              autoFocus
             />
-            <p className="form-hint">
-              💡 提示：输入包含图片的文件夹完整路径
-            </p>
           </div>
 
           <div className="form-field">

@@ -42,6 +42,13 @@ class ApiClient {
     return () => this.listeners.delete(callback);
   }
 
+  // 打开系统文件夹选择对话框
+  async selectFolder() {
+    const response = await fetch(`${API_BASE}/select-folder`);
+    if (!response.ok) throw new Error('打开文件夹选择器失败');
+    return response.json();
+  }
+
   // 获取所有项目
   async getProjects() {
     const response = await fetch(`${API_BASE}/projects`);
