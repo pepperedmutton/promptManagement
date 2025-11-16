@@ -80,84 +80,199 @@ export function ProjectProvider({ children }) {
     }
   }
 
-  // 添加图片到项目
+  // 添加图片到项目（乐观更新）
   const addImageToProject = async (projectId, file, prompt = '') => {
-    try {
-      const imageId = await apiClient.addImageToProject(projectId, file, prompt)
-      await loadProjects() // 重新加载以获取最新数据
-      return imageId
-    } catch (error) {
-      console.error('添加图片失败:', error)
-      throw error
+    // 生成临时 ID 和 blob URL 用于立即预览
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const blobUrl = URL.createObjectURL(file)
+    
+    const tempImage = {
+      id: tempId,
+      filename: file.name,
+      mime: file.type,
+      prompt: prompt || '',
+      addedAt: new Date().toISOString(),
+      isOptimistic: true, // 标记为乐观更新
+      previewUrl: blobUrl  // 临时预览 URL
     }
-  }
-
-  // 更新图片 prompt
-  const updateImagePrompt = async (projectId, imageId, prompt) => {
+    
+    // 立即更新本地状态
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === projectId
+          ? { ...p, images: [...p.images, tempImage] }
+          : p
+      )
+    )
+    
     try {
-      // 记录旧值用于撤销
-      const project = projects.find(p => p.id === projectId)
-      const image = project?.images.find(img => img.id === imageId)
-      if (image) {
-        setHistory(prev => [...prev, {
-          type: 'UPDATE_PROMPT',
-          projectId,
-          imageId,
-          oldPrompt: image.prompt,
-          newPrompt: prompt,
-          timestamp: Date.now()
-        }])
-      }
-
-      await apiClient.updateImagePrompt(projectId, imageId, prompt)
+      // 发送到后端
+      const response = await apiClient.addImageToProject(projectId, file, prompt)
       
-      // 立即更新本地状态
+      // 释放 blob URL
+      URL.revokeObjectURL(blobUrl)
+      
+      // 后端返回后，用真实数据替换临时数据
       setProjects(prev =>
         prev.map(p =>
           p.id === projectId
             ? {
                 ...p,
                 images: p.images.map(img =>
-                  img.id === imageId ? { ...img, prompt } : img
+                  img.id === tempId
+                    ? { 
+                        id: response.id, 
+                        filename: response.filename,
+                        mime: response.mime,
+                        prompt: response.prompt,
+                        addedAt: response.addedAt,
+                        isOptimistic: false,
+                        previewUrl: undefined
+                      }
+                    : img
                 )
               }
             : p
         )
       )
+      
+      console.log('✓ 图片已保存，等待文件系统同步...')
+      return response.id
     } catch (error) {
+      // 失败时移除乐观更新并释放 blob URL
+      URL.revokeObjectURL(blobUrl)
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? { ...p, images: p.images.filter(img => img.id !== tempId) }
+            : p
+        )
+      )
+      console.error('添加图片失败:', error)
+      throw error
+    }
+  }
+
+  // 更新图片 prompt（乐观更新）
+  const updateImagePrompt = async (projectId, imageId, prompt) => {
+    // 记录旧值
+    const project = projects.find(p => p.id === projectId)
+    const image = project?.images.find(img => img.id === imageId)
+    const oldPrompt = image?.prompt || ''
+    
+    if (image) {
+      setHistory(prev => [...prev, {
+        type: 'UPDATE_PROMPT',
+        projectId,
+        imageId,
+        oldPrompt,
+        newPrompt: prompt,
+        timestamp: Date.now()
+      }])
+    }
+    
+    // 立即更新本地状态
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === projectId
+          ? {
+              ...p,
+              images: p.images.map(img =>
+                img.id === imageId
+                  ? { ...img, prompt, isOptimistic: true }
+                  : img
+              )
+            }
+          : p
+      )
+    )
+
+    try {
+      // 发送到后端
+      await apiClient.updateImagePrompt(projectId, imageId, prompt)
+      
+      // 移除乐观标记
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                images: p.images.map(img =>
+                  img.id === imageId
+                    ? { ...img, isOptimistic: false }
+                    : img
+                )
+              }
+            : p
+        )
+      )
+      
+      console.log('✓ Prompt 已保存，等待文件系统同步...')
+    } catch (error) {
+      // 失败时恢复旧值
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                images: p.images.map(img =>
+                  img.id === imageId
+                    ? { ...img, prompt: oldPrompt, isOptimistic: false }
+                    : img
+                )
+              }
+            : p
+        )
+      )
       console.error('更新 prompt 失败:', error)
       throw error
     }
   }
 
-  // 删除图片
+  // 删除图片（乐观更新）
   const deleteImage = async (projectId, imageId) => {
-    try {
-      // 记录被删除的图片用于撤销
-      const project = projects.find(p => p.id === projectId)
-      const image = project?.images.find(img => img.id === imageId)
-      if (image) {
-        setHistory(prev => [...prev, {
-          type: 'DELETE_IMAGE',
-          projectId,
-          image: { ...image },
-          imageIndex: project.images.findIndex(img => img.id === imageId),
-          timestamp: Date.now()
-        }])
-      }
-
-      await apiClient.deleteImage(projectId, imageId)
-      
-      // 立即更新本地状态
-      setProjects(prev =>
-        prev.map(p => {
-          if (p.id === projectId) {
-            return { ...p, images: p.images.filter(img => img.id !== imageId) }
-          }
-          return p
-        })
+    // 记录被删除的图片
+    const project = projects.find(p => p.id === projectId)
+    const image = project?.images.find(img => img.id === imageId)
+    const imageIndex = project?.images.findIndex(img => img.id === imageId)
+    
+    if (image) {
+      setHistory(prev => [...prev, {
+        type: 'DELETE_IMAGE',
+        projectId,
+        image: { ...image },
+        imageIndex,
+        timestamp: Date.now()
+      }])
+    }
+    
+    // 立即从本地状态移除
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === projectId
+          ? { ...p, images: p.images.filter(img => img.id !== imageId) }
+          : p
       )
+    )
+
+    try {
+      // 发送到后端
+      await apiClient.deleteImage(projectId, imageId)
+      console.log('✓ 图片已删除，等待文件系统同步...')
     } catch (error) {
+      // 失败时恢复图片
+      if (image && imageIndex !== undefined) {
+        setProjects(prev =>
+          prev.map(p => {
+            if (p.id === projectId) {
+              const newImages = [...p.images]
+              newImages.splice(imageIndex, 0, image)
+              return { ...p, images: newImages }
+            }
+            return p
+          })
+        )
+      }
       console.error('删除图片失败:', error)
       throw error
     }

@@ -8,7 +8,8 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
 
-  const imageUrl = getImageUrl(projectId, image.filename)
+  // 使用 previewUrl（乐观更新）或真实 URL
+  const imageUrl = image.previewUrl || getImageUrl(projectId, image.filename)
 
   const handleCopyPrompt = async () => {
     if (!image.prompt) return
@@ -45,7 +46,7 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
   }, [menuOpen])
 
   return (
-    <div className="image-card">
+    <div className={`image-card ${image.isOptimistic ? 'image-card--optimistic' : ''}`}>
       <div className="image-card__wrapper">
         {imageError ? (
           <div className="image-card__placeholder">加载失败</div>
@@ -56,6 +57,13 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
             className="image-card__img"
             onError={() => setImageError(true)}
           />
+        )}
+        
+        {/* 乐观更新指示器 */}
+        {image.isOptimistic && (
+          <div className="image-card__optimistic-badge">
+            ⏳ 同步中...
+          </div>
         )}
         
         {/* 左上角三点菜单 */}

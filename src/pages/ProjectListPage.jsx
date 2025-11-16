@@ -13,7 +13,7 @@ export function ProjectListPage() {
   const [projectName, setProjectName] = useState('')
   const [isSelecting, setIsSelecting] = useState(false)
 
-  // 使用系统文件夹选择器
+  // 使用后端 API 调用系统文件夹选择器
   const handleSelectFolder = async () => {
     try {
       setIsSelecting(true)
@@ -29,7 +29,11 @@ export function ProjectListPage() {
       }
     } catch (error) {
       console.error('选择文件夹失败:', error)
-      alert('选择文件夹失败，请手动输入路径')
+      if (error.message.includes('未选择')) {
+        // 用户取消了选择，不显示错误
+        return
+      }
+      alert('选择文件夹失败: ' + error.message)
     } finally {
       setIsSelecting(false)
     }
@@ -111,10 +115,10 @@ export function ProjectListPage() {
               onClick={handleSelectFolder}
               disabled={isSelecting}
             >
-              {isSelecting ? '正在选择...' : '🗂️ 浏览并选择文件夹'}
+              {isSelecting ? '正在打开选择器...' : '🗂️ 浏览并选择文件夹'}
             </Button>
             <p className="form-hint">
-              💡 点击按钮选择包含图片的文件夹
+              💡 点击按钮打开系统文件夹选择对话框
             </p>
           </div>
 
@@ -128,9 +132,12 @@ export function ProjectListPage() {
               className="form-input"
               value={folderPath}
               onChange={(e) => setFolderPath(e.target.value)}
-              placeholder="或手动输入：D:\SD\outputs\project1"
+              placeholder="例如：D:\SD\outputs\project1"
               required
             />
+            <p className="form-hint">
+              💡 使用上方按钮选择，或手动输入文件夹路径
+            </p>
           </div>
 
           <div className="form-field">

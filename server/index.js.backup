@@ -1,0 +1,619 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const http = require('http');
+
+// 导入服务模块
+const { initDataDir, loadProjects } = require('./services/storage');
+const { setupFileWatcher, setBroadcastCallback } = require('./services/fileWatcher');
+const { initWebSocketServer, broadcast } = require('./services/websocket');
+
+// 导入路由模块
+const projectsRouter = require('./routes/projects');
+const imagesRouter = require('./routes/images');
+const foldersRouter = require('./routes/folders');
+
+// 导入中间件
+const { errorHandler, requestLogger, notFoundHandler } = require('./middleware');
+
+const app = express();
+const PORT = 3001;
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+app.use(requestLogger);
+
+// 动态提供项目文件夹中的图片
+app.get('/images/:projectId/:filename', async (req, res) => {
+  try {
+    const { projectId, filename } = req.params;
+    const projects = await loadProjects();
+    const project = projects.find(p => p.id === projectId);
+    
+    if (!project || !project.folderPath) {
+      return res.status(404).send('项目不存在');
+    }
+    
+    const imagePath = path.join(project.folderPath, filename);
+    res.sendFile(imagePath);
+  } catch (error) {
+    res.status(404).send('文件不存在');
+  }
+});
+
+// API 路由
+app.use('/api/projects', projectsRouter);
+app.use('/api/images', imagesRouter);
+app.use('/api/select-folder', foldersRouter);
+
+// 404 和错误处理
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// 全局变量存储 updateWatcher 函数
+let updateWatcher = null;
+
+// 初始化数据目录（已移到 storage.js，这里只是为了向后兼容）
+async function initDataDir_deprecated() {
+  try {
+    await initDataDir();
+    } catch {
+      await fs.writeFile(PROJECTS_FILE, JSON.stringify([], null, 2));
+    }
+    
+    console.log(`✓ 数据目录初始化完成: ${DATA_DIR}`);
+  } catch (error) {
+    console.error('初始化数据目录失败:', error);
+  }
+}
+
+// 读取项目数据
+async function loadProjects() {
+  try {
+    const data = await fs.readFile(PROJECTS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('读取项目数据失败:', error);
+    return [];
+  }
+}
+
+// 保存项目数据
+async function saveProjects(projects) {
+  try {
+    await fs.writeFile(PROJECTS_FILE, JSON.stringify(projects, null, 2));
+    broadcastUpdate({ type: 'projects-updated' });
+  } catch (error) {
+    console.error('保存项目数据失败:', error);
+    throw error;
+  }
+}
+
+// API 路由
+
+// 打开文件夹选择对话框
+app.get('/api/select-folder', async (req, res) => {
+  try {
+    const vbsPath = path.join(__dirname, '..', 'select-folder.vbs');
+    const outputPath = path.join(__dirname, '..', 'selected-folder.txt');
+    
+    // 删除旧的输出文件
+    try {
+      await fs.unlink(outputPath);
+    } catch {}
+    
+    // 执行 VBS 脚本打开文件夹选择器
+    const { stdout, stderr } = await execPromise(`cscript //nologo "${vbsPath}"`);
+    
+    const result = stdout.trim();
+    
+    if (result === 'CANCELLED' || result === '') {
+      return res.status(400).json({ error: '未选择文件夹' });
+    }
+    
+    // 尝试从输出文件读取路径（更可靠）
+    try {
+      const selectedPath = await fs.readFile(outputPath, 'utf-8');
+      const folderPath = selectedPath.trim();
+      
+      // 清理临时文件
+      await fs.unlink(outputPath).catch(() => {});
+      
+      if (folderPath) {
+        res.json({ path: folderPath });
+      } else {
+        res.status(400).json({ error: '未选择文件夹' });
+      }
+    } catch {
+      // 如果文件读取失败，使用标准输出
+      if (result && result !== 'CANCELLED') {
+        res.json({ path: result });
+      } else {
+        res.status(400).json({ error: '未选择文件夹' });
+      }
+    }
+  } catch (error) {
+    console.error('打开文件夹选择器失败:', error);
+    res.status(500).json({ error: '打开文件夹选择器失败' });
+  }
+});
+
+// 获取所有项目
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await loadProjects();
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ error: '获取项目列表失败' });
+  }
+});
+
+// 打开/添加文件夹作为项目
+app.post('/api/projects/open-folder', async (req, res) => {
+  try {
+    const { folderPath, name } = req.body;
+    
+    if (!folderPath) {
+      return res.status(400).json({ error: '必须提供文件夹路径' });
+    }
+    
+    // 检查文件夹是否存在
+    try {
+      await fs.access(folderPath);
+    } catch {
+      return res.status(400).json({ error: '文件夹不存在' });
+    }
+    
+    const projects = await loadProjects();
+    
+    // 检查是否已经添加过这个文件夹
+    const existing = projects.find(p => p.folderPath === folderPath);
+    if (existing) {
+      return res.json(existing);
+    }
+    
+    const newProject = {
+      id: Date.now().toString(),
+      name: name || path.basename(folderPath),
+      folderPath,
+      createdAt: new Date().toISOString(),
+      images: []
+    };
+    
+    // 扫描文件夹中的图片
+    await scanProjectFolder(newProject);
+    
+    projects.push(newProject);
+    await saveProjects(projects);
+    
+    // 更新文件监听
+    await onProjectAdded();
+    
+    res.json(newProject);
+  } catch (error) {
+    console.error('打开文件夹失败:', error);
+    res.status(500).json({ error: '打开文件夹失败' });
+  }
+});
+
+// 扫描项目文件夹
+async function scanProjectFolder(project) {
+  try {
+    const files = await fs.readdir(project.folderPath);
+    const imageFiles = files.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
+    
+    project.images = [];
+    
+    for (const file of imageFiles) {
+      const imageId = path.parse(file).name;
+      
+      // 读取对应的 prompt 文件
+      let prompt = '';
+      const promptFile = path.join(project.folderPath, `${imageId}.txt`);
+      try {
+        prompt = await fs.readFile(promptFile, 'utf-8');
+      } catch {}
+      
+      const stat = await fs.stat(path.join(project.folderPath, file));
+      project.images.push({
+        id: imageId,
+        filename: file,
+        mime: `image/${path.extname(file).slice(1)}`,
+        prompt,
+        addedAt: stat.birthtime.toISOString()
+      });
+    }
+    
+    console.log(`✓ 扫描到 ${project.images.length} 张图片`);
+  } catch (error) {
+    console.error('扫描文件夹失败:', error);
+  }
+}
+
+// 从列表移除项目（不删除文件）
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const projects = await loadProjects();
+    
+    const projectIndex = projects.findIndex(p => p.id === id);
+    if (projectIndex === -1) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    // 只从列表移除，不删除文件夹
+    projects.splice(projectIndex, 1);
+    await saveProjects(projects);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('移除项目失败:', error);
+    res.status(500).json({ error: '移除项目失败' });
+  }
+});
+
+// 更新项目（只能修改名称）
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    const projects = await loadProjects();
+    
+    const project = projects.find(p => p.id === id);
+    if (!project) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    if (name) project.name = name;
+    
+    await saveProjects(projects);
+    res.json(project);
+  } catch (error) {
+    console.error('更新项目失败:', error);
+    res.status(500).json({ error: '更新项目失败' });
+  }
+});
+
+// 上传图片
+const multer = require('multer');
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const projectId = req.params.projectId;
+    const projects = await loadProjects();
+    const project = projects.find(p => p.id === projectId);
+    
+    if (!project || !project.folderPath) {
+      return cb(new Error('项目不存在或未关联文件夹'));
+    }
+    
+    cb(null, project.folderPath);
+  },
+  filename: (req, file, cb) => {
+    const imageId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${imageId}${ext}`);
+  }
+});
+const upload = multer({ storage });
+
+app.post('/api/projects/:projectId/images', upload.single('image'), async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { prompt } = req.body;
+    const projects = await loadProjects();
+    
+    const project = projects.find(p => p.id === projectId);
+    if (!project) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    const imageId = path.parse(req.file.filename).name;
+    
+    // 如果有 prompt，立即保存为 txt 文件
+    if (prompt) {
+      const promptFile = path.join(project.folderPath, `${imageId}.txt`);
+      await fs.writeFile(promptFile, prompt, 'utf-8');
+    }
+    
+    // 不需要手动更新 projects.json，文件监听会自动同步
+    // 只返回新图片的信息
+    const newImage = {
+      id: imageId,
+      filename: req.file.filename,
+      mime: req.file.mimetype,
+      prompt: prompt || '',
+      addedAt: new Date().toISOString()
+    };
+    
+    res.json(newImage);
+  } catch (error) {
+    console.error('上传图片失败:', error);
+    res.status(500).json({ error: '上传图片失败' });
+  }
+});
+
+// 更新图片 prompt
+app.put('/api/projects/:projectId/images/:imageId/prompt', async (req, res) => {
+  try {
+    const { projectId, imageId } = req.params;
+    const { prompt } = req.body;
+    const projects = await loadProjects();
+    
+    const project = projects.find(p => p.id === projectId);
+    if (!project) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    // 直接保存 prompt 到 txt 文件（本地优先）
+    const promptFile = path.join(project.folderPath, `${imageId}.txt`);
+    await fs.writeFile(promptFile, prompt, 'utf-8');
+    
+    // 不需要手动更新 projects.json，文件监听会自动同步
+    // 立即返回更新后的数据
+    res.json({ id: imageId, prompt });
+  } catch (error) {
+    console.error('更新 prompt 失败:', error);
+    res.status(500).json({ error: '更新 prompt 失败' });
+  }
+});
+
+// 删除图片
+app.delete('/api/projects/:projectId/images/:imageId', async (req, res) => {
+  try {
+    const { projectId, imageId } = req.params;
+    const projects = await loadProjects();
+    
+    const project = projects.find(p => p.id === projectId);
+    if (!project) {
+      return res.status(404).json({ error: '项目不存在' });
+    }
+    
+    const image = project.images.find(img => img.id === imageId);
+    if (!image) {
+      return res.status(404).json({ error: '图片不存在' });
+    }
+    
+    // 删除本地文件（本地优先）
+    const imageFile = path.join(project.folderPath, image.filename);
+    const promptFile = path.join(project.folderPath, `${imageId}.txt`);
+    
+    await fs.unlink(imageFile).catch(() => {});
+    await fs.unlink(promptFile).catch(() => {});
+    
+    // 不需要手动更新 projects.json，文件监听会自动同步
+    res.json({ success: true });
+  } catch (error) {
+    console.error('删除图片失败:', error);
+    res.status(500).json({ error: '删除图片失败' });
+  }
+});
+
+// WebSocket 服务器用于实时通知
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  console.log('✓ 新的 WebSocket 连接');
+  clients.add(ws);
+  
+  ws.on('close', () => {
+    clients.delete(ws);
+  });
+});
+
+function broadcastUpdate(data) {
+  const message = JSON.stringify(data);
+  clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+// 文件监听 - 监听所有项目文件夹
+function setupFileWatcher() {
+  let watcher = null;
+  
+  async function updateWatcher() {
+    // 关闭旧的 watcher
+    if (watcher) {
+      await watcher.close();
+    }
+    
+    const projects = await loadProjects();
+    const folders = projects
+      .filter(p => p.folderPath && fsSync.existsSync(p.folderPath))
+      .map(p => p.folderPath);
+    
+    if (folders.length === 0) {
+      console.log('没有需要监听的文件夹');
+      return;
+    }
+    
+    watcher = chokidar.watch(folders, {
+      ignored: /(^|[\/\\])\../, // 忽略隐藏文件
+      persistent: true,
+      ignoreInitial: true,
+      usePolling: true,        // 使用轮询模式，更可靠
+      interval: 100,            // 轮询间隔 100ms
+      binaryInterval: 300,      // 二进制文件轮询间隔 300ms
+      awaitWriteFinish: {
+        stabilityThreshold: 200,  // 文件稳定性阈值降低到 200ms
+        pollInterval: 50          // 轮询间隔 50ms
+      },
+      atomic: true              // 支持原子写入
+    });
+    
+    watcher
+      .on('add', async (filePath) => {
+        console.log(`✓ 文件添加: ${path.basename(filePath)}`);
+        // 立即同步，不再延迟
+        await syncFileSystemToDatabase();
+      })
+      .on('unlink', async (filePath) => {
+        console.log(`✓ 文件删除: ${path.basename(filePath)}`);
+        // 立即同步
+        await syncFileSystemToDatabase();
+      })
+      .on('change', async (filePath) => {
+        if (filePath.endsWith('.txt')) {
+          console.log(`✓ Prompt 更新: ${path.basename(filePath)}`);
+          // 立即同步
+          await syncFileSystemToDatabase();
+        }
+      });
+    
+    console.log(`✓ 正在监听 ${folders.length} 个文件夹`);
+  }
+  
+  updateWatcher();
+  
+  // 返回更新函数供外部调用
+  return updateWatcher;
+}
+
+let updateWatcher = null;
+let syncTimeout = null;
+let isSyncing = false;
+
+// 同步文件系统到数据库（带防抖）
+async function syncFileSystemToDatabase() {
+  // 如果正在同步，跳过
+  if (isSyncing) {
+    console.log('⏳ 同步进行中，跳过本次触发');
+    return;
+  }
+  
+  // 清除之前的定时器
+  if (syncTimeout) {
+    clearTimeout(syncTimeout);
+  }
+  
+  // 使用极短的防抖延迟（50ms），快速响应但避免过度触发
+  syncTimeout = setTimeout(async () => {
+    isSyncing = true;
+    try {
+      await performSync();
+    } finally {
+      isSyncing = false;
+    }
+  }, 50);
+}
+
+// 执行实际的同步操作
+async function performSync() {
+  try {
+    const projects = await loadProjects();
+    let hasChanges = false;
+    
+    for (const project of projects) {
+      if (!project.folderPath || !fsSync.existsSync(project.folderPath)) {
+        continue;
+      }
+      
+      try {
+        const files = await fs.readdir(project.folderPath);
+        const imageFiles = files.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
+        
+        // 检查新增的图片文件
+        for (const file of imageFiles) {
+          const imageId = path.parse(file).name;
+          const exists = project.images.some(img => img.id === imageId);
+          
+          if (!exists) {
+            // 读取对应的 prompt 文件
+            let prompt = '';
+            const promptFile = path.join(project.folderPath, `${imageId}.txt`);
+            try {
+              prompt = await fs.readFile(promptFile, 'utf-8');
+            } catch {}
+            
+            const stat = await fs.stat(path.join(project.folderPath, file));
+            project.images.push({
+              id: imageId,
+              filename: file,
+              mime: `image/${path.extname(file).slice(1)}`,
+              prompt,
+              addedAt: stat.birthtime.toISOString()
+            });
+            
+            hasChanges = true;
+            console.log(`✓ 同步新图片: ${file}`);
+          }
+        }
+        
+        // 检查已删除的图片
+        const imagesToRemove = [];
+        for (const image of project.images) {
+          const imagePath = path.join(project.folderPath, image.filename);
+          if (!fsSync.existsSync(imagePath)) {
+            imagesToRemove.push(image.id);
+          }
+        }
+        
+        if (imagesToRemove.length > 0) {
+          project.images = project.images.filter(img => !imagesToRemove.includes(img.id));
+          hasChanges = true;
+          console.log(`✓ 移除已删除的图片: ${imagesToRemove.length} 个`);
+        }
+        
+        // 更新 prompt（检查 txt 文件）
+        for (const image of project.images) {
+          const promptFile = path.join(project.folderPath, `${image.id}.txt`);
+          try {
+            const prompt = await fs.readFile(promptFile, 'utf-8');
+            if (image.prompt !== prompt) {
+              image.prompt = prompt;
+              hasChanges = true;
+            }
+          } catch {
+            // txt 文件不存在，清空 prompt
+            if (image.prompt !== '') {
+              image.prompt = '';
+              hasChanges = true;
+            }
+          }
+        }
+        
+      } catch (error) {
+        console.error(`扫描项目 ${project.name} 失败:`, error);
+      }
+    }
+    
+    if (hasChanges) {
+      await saveProjects(projects);
+      console.log('✓ 数据库已同步');
+    }
+  } catch (error) {
+    console.error('同步文件系统失败:', error);
+  }
+}
+
+// 启动服务器
+async function start() {
+  await initDataDir();
+  await performSync(); // 启动时同步一次
+  updateWatcher = setupFileWatcher();
+  
+  server.listen(PORT, () => {
+    console.log('========================================');
+    console.log('  Prompt 管理工具 - 后端服务');
+    console.log('========================================');
+    console.log(`✓ HTTP 服务器运行在: http://localhost:${PORT}`);
+    console.log(`✓ WebSocket 服务器运行在: ws://localhost:${PORT}`);
+    console.log(`✓ 数据目录: ${DATA_DIR}`);
+    console.log('========================================');
+  });
+}
+
+start().catch(console.error);
+
+// 在打开新文件夹后更新监听
+async function onProjectAdded() {
+  if (updateWatcher) {
+    await updateWatcher();
+  }
+}

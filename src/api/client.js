@@ -5,6 +5,9 @@ class ApiClient {
   constructor() {
     this.ws = null;
     this.listeners = new Set();
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 10;
+    this.reconnectDelay = 1000; // 初始重连延迟 1 秒
     this.connectWebSocket();
   }
 
@@ -14,26 +17,43 @@ class ApiClient {
       this.ws = new WebSocket(WS_URL);
       
       this.ws.onopen = () => {
-        console.log('✓ WebSocket 已连接');
+        console.log('✅ WebSocket 已连接');
+        this.reconnectAttempts = 0; // 重置重连计数
+        this.reconnectDelay = 1000;  // 重置延迟
       };
       
       this.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        console.log('📨 收到更新:', data.type);
         this.listeners.forEach(listener => listener(data));
       };
       
       this.ws.onclose = () => {
-        console.log('WebSocket 断开，3秒后重连...');
-        setTimeout(() => this.connectWebSocket(), 3000);
+        console.log('⚠️ WebSocket 断开');
+        this.scheduleReconnect();
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket 错误:', error);
+        console.error('❌ WebSocket 错误:', error);
       };
     } catch (error) {
-      console.error('WebSocket 连接失败:', error);
-      setTimeout(() => this.connectWebSocket(), 3000);
+      console.error('❌ WebSocket 连接失败:', error);
+      this.scheduleReconnect();
     }
+  }
+
+  // 调度重连
+  scheduleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ WebSocket 重连失败次数过多，停止重连');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000); // 最多 30 秒
+    
+    console.log(`🔄 ${delay / 1000} 秒后尝试重连... (第 ${this.reconnectAttempts} 次)`);
+    setTimeout(() => this.connectWebSocket(), delay);
   }
 
   // 订阅更新
@@ -45,7 +65,10 @@ class ApiClient {
   // 打开系统文件夹选择对话框
   async selectFolder() {
     const response = await fetch(`${API_BASE}/select-folder`);
-    if (!response.ok) throw new Error('打开文件夹选择器失败');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '打开文件夹选择器失败');
+    }
     return response.json();
   }
 
@@ -99,18 +122,18 @@ class ApiClient {
     formData.append('image', file);
     formData.append('prompt', prompt);
 
-    const response = await fetch(`${API_BASE}/projects/${projectId}/images`, {
+    const response = await fetch(`${API_BASE}/images/${projectId}`, {
       method: 'POST',
       body: formData
     });
     if (!response.ok) throw new Error('上传图片失败');
-    const image = await response.json();
-    return image.id;
+    const data = await response.json();
+    return data.image; // 返回完整的图片对象
   }
 
   // 更新图片 prompt
   async updateImagePrompt(projectId, imageId, prompt) {
-    const response = await fetch(`${API_BASE}/projects/${projectId}/images/${imageId}/prompt`, {
+    const response = await fetch(`${API_BASE}/images/${projectId}/${imageId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
@@ -121,7 +144,7 @@ class ApiClient {
 
   // 删除图片
   async deleteImage(projectId, imageId) {
-    const response = await fetch(`${API_BASE}/projects/${projectId}/images/${imageId}`, {
+    const response = await fetch(`${API_BASE}/images/${projectId}/${imageId}`, {
       method: 'DELETE'
     });
     if (!response.ok) throw new Error('删除图片失败');

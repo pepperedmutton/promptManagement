@@ -5,6 +5,9 @@ dist/
 # Data directory (user files)
 /data/
 
+# Temporary files
+selected-folder.txt
+
 # Local data and user files
 *.local
 .DS_Store

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '../contexts/ProjectContext'
 import { ImageCard } from '../components/ImageCard'
@@ -20,6 +20,25 @@ export function PromptManagerPage() {
   } = useProjects()
 
   const project = getProject(projectId)
+  const pasteProcessingRef = useRef(false)
+
+  // 添加图片并尝试读取 PNG metadata
+  const addImageWithMetadata = useCallback(async (file) => {
+    const imageData = await addImageToProject(projectId, file)
+    
+    // 如果是 PNG 文件，尝试提取 prompt
+    if (file.type === 'image/png') {
+      const metadata = await extractPngMetadata(file)
+      const prompt = extractPromptFromMetadata(metadata)
+      
+      if (prompt) {
+        // 自动填充 prompt
+        updateImagePrompt(projectId, imageData.id, prompt)
+      }
+    }
+    
+    return imageData.id
+  }, [projectId, addImageToProject, updateImagePrompt])
 
   // 处理图片上传（包含 PNG metadata 读取）
   const handleImageUpload = async (e) => {
@@ -29,22 +48,6 @@ export function PromptManagerPage() {
     }
     // Reset input
     e.target.value = ''
-  }
-
-  // 添加图片并尝试读取 PNG metadata
-  const addImageWithMetadata = async (file) => {
-    const imageId = await addImageToProject(projectId, file)
-    
-    // 如果是 PNG 文件，尝试提取 prompt
-    if (file.type === 'image/png') {
-      const metadata = await extractPngMetadata(file)
-      const prompt = extractPromptFromMetadata(metadata)
-      
-      if (prompt) {
-        // 自动填充 prompt
-        updateImagePrompt(projectId, imageId, prompt)
-      }
-    }
   }
 
   // Ctrl+Z 撤销快捷键
@@ -63,27 +66,52 @@ export function PromptManagerPage() {
   // 粘贴图片支持
   useEffect(() => {
     const handlePaste = async (e) => {
+      // 使用 ref 防止重复处理
+      if (pasteProcessingRef.current) {
+        console.log('粘贴正在处理中，忽略重复事件')
+        return
+      }
+      
       const items = e.clipboardData?.items
       if (!items) return
 
+      // 查找第一个图片项
       for (let i = 0; i < items.length; i++) {
         const item = items[i]
         
-        // 检查是否是图片
         if (item.type.indexOf('image') !== -1) {
           e.preventDefault()
+          e.stopPropagation()
+          
+          pasteProcessingRef.current = true
+          console.log('开始处理粘贴的图片')
+          
           const file = item.getAsFile()
           if (file) {
-            await addImageWithMetadata(file)
+            try {
+              await addImageWithMetadata(file)
+              console.log('图片粘贴完成')
+            } catch (error) {
+              console.error('粘贴图片失败:', error)
+            }
           }
+          
+          // 500ms 后重置标志
+          setTimeout(() => {
+            pasteProcessingRef.current = false
+            console.log('粘贴处理标志已重置')
+          }, 1000)
+          
+          return // 只处理第一个图片，立即返回
         }
       }
     }
 
-    window.addEventListener('paste', handlePaste)
-    return () => window.removeEventListener('paste', handlePaste)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+    window.addEventListener('paste', handlePaste, true) // 使用捕获阶段
+    return () => {
+      window.removeEventListener('paste', handlePaste, true)
+    }
+  }, [addImageWithMetadata])
 
   if (!project) {
     return (
