@@ -14,7 +14,7 @@ export function ProjectCard({ project, onDelete }) {
 
   const handleDelete = (e) => {
     e.stopPropagation()
-    if (window.confirm(`确定删除项目 "${project.name}"？此操作不可恢复。`)) {
+    if (window.confirm(`确定从列表移除项目 "${project.name}"？\n\n文件夹中的文件不会被删除。`)) {
       onDelete(project.id)
     }
   }
@@ -26,14 +26,16 @@ export function ProjectCard({ project, onDelete }) {
         <button
           className="project-card__delete"
           onClick={handleDelete}
-          title="删除项目"
+          title="从列表移除"
         >
           ✕
         </button>
       </div>
 
-      {project.description && (
-        <p className="project-card__description">{project.description}</p>
+      {project.folderPath && (
+        <p className="project-card__path" title={project.folderPath}>
+          📁 {project.folderPath}
+        </p>
       )}
 
       <div className="project-card__stats">

@@ -6,18 +6,22 @@ import { Button } from '../components/Button'
 import './ProjectListPage.css'
 
 export function ProjectListPage() {
-  const { projects, createProject, deleteProject } = useProjects()
+  const { projects, openFolder, deleteProject } = useProjects()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [folderPath, setFolderPath] = useState('')
   const [projectName, setProjectName] = useState('')
-  const [projectDescription, setProjectDescription] = useState('')
 
-  const handleCreateProject = (e) => {
+  const handleOpenFolder = async (e) => {
     e.preventDefault()
-    if (projectName.trim()) {
-      createProject(projectName.trim(), projectDescription.trim())
-      setProjectName('')
-      setProjectDescription('')
-      setIsModalOpen(false)
+    if (folderPath.trim()) {
+      try {
+        await openFolder(folderPath.trim(), projectName.trim() || undefined)
+        setFolderPath('')
+        setProjectName('')
+        setIsModalOpen(false)
+      } catch (error) {
+        alert(error.message || '打开文件夹失败')
+      }
     }
   }
 
@@ -26,14 +30,14 @@ export function ProjectListPage() {
       <header className="page-header">
         <div className="page-header__content">
           <h1 className="page-header__title">Stable Diffusion Prompt 管理器</h1>
-          <p className="page-header__subtitle">管理你的 AI 创作项目和 Prompt 库</p>
+          <p className="page-header__subtitle">打开本地文件夹管理图片和 Prompt</p>
         </div>
         <Button
           variant="primary"
           size="large"
           onClick={() => setIsModalOpen(true)}
         >
-          ➕ 新建项目
+          📁 打开文件夹
         </Button>
       </header>
 
@@ -41,16 +45,16 @@ export function ProjectListPage() {
         {projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__icon">📁</div>
-            <h2 className="empty-state__title">还没有项目</h2>
+            <h2 className="empty-state__title">还没有打开的文件夹</h2>
             <p className="empty-state__description">
-              创建你的第一个项目，开始管理 Stable Diffusion 图片和 Prompt
+              选择一个包含 Stable Diffusion 图片的文件夹开始管理
             </p>
             <Button
               variant="secondary"
               size="large"
               onClick={() => setIsModalOpen(true)}
             >
-              创建第一个项目
+              打开第一个文件夹
             </Button>
           </div>
         ) : (
@@ -69,12 +73,31 @@ export function ProjectListPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="新建项目"
+        title="打开文件夹"
       >
-        <form onSubmit={handleCreateProject} className="project-form">
+        <form onSubmit={handleOpenFolder} className="project-form">
+          <div className="form-field">
+            <label htmlFor="folder-path" className="form-label">
+              文件夹路径 <span className="required">*</span>
+            </label>
+            <input
+              id="folder-path"
+              type="text"
+              className="form-input"
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+              placeholder="例如：D:\SD\outputs\project1"
+              required
+              autoFocus
+            />
+            <p className="form-hint">
+              💡 提示：输入包含图片的文件夹完整路径
+            </p>
+          </div>
+
           <div className="form-field">
             <label htmlFor="project-name" className="form-label">
-              项目名称 <span className="required">*</span>
+              项目名称（可选）
             </label>
             <input
               id="project-name"
@@ -82,23 +105,7 @@ export function ProjectListPage() {
               className="form-input"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              placeholder="例如：角色设计、风景画集..."
-              required
-              autoFocus
-            />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="project-description" className="form-label">
-              项目描述（可选）
-            </label>
-            <textarea
-              id="project-description"
-              className="form-textarea"
-              value={projectDescription}
-              onChange={(e) => setProjectDescription(e.target.value)}
-              placeholder="简单描述这个项目的用途..."
-              rows={3}
+              placeholder="留空则使用文件夹名称"
             />
           </div>
 
@@ -111,7 +118,7 @@ export function ProjectListPage() {
               取消
             </Button>
             <Button type="submit" variant="secondary">
-              创建项目
+              打开文件夹
             </Button>
           </div>
         </form>

@@ -49,23 +49,29 @@ class ApiClient {
     return response.json();
   }
 
-  // 创建项目
-  async createProject(name, description = '') {
-    const response = await fetch(`${API_BASE}/projects`, {
+  // 打开文件夹作为项目
+  async openFolder(folderPath, name) {
+    const response = await fetch(`${API_BASE}/projects/open-folder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description })
+      body: JSON.stringify({ folderPath, name })
     });
-    if (!response.ok) throw new Error('创建项目失败');
+    if (!response.ok) throw new Error('打开文件夹失败');
     return response.json();
   }
 
-  // 删除项目
+  // 创建项目（废弃，保留兼容）
+  async createProject(name, description = '') {
+    // 不再使用，改为使用 openFolder
+    throw new Error('请使用 openFolder 方法');
+  }
+
+  // 从列表移除项目（不删除文件）
   async deleteProject(projectId) {
     const response = await fetch(`${API_BASE}/projects/${projectId}`, {
       method: 'DELETE'
     });
-    if (!response.ok) throw new Error('删除项目失败');
+    if (!response.ok) throw new Error('移除项目失败');
     return response.json();
   }
 

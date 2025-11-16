@@ -58,6 +58,17 @@
   line-height: 1.5;
 }
 
+.project-card__path {
+  color: var(--color-gray-500);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-bottom: var(--spacing-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
 .project-card__stats {
   display: flex;
   gap: var(--spacing-lg);

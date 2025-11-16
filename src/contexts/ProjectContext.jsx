@@ -34,25 +34,35 @@ export function ProjectProvider({ children }) {
     }
   }
 
-  // 创建项目
-  const createProject = async (name, description = '') => {
+  // 打开文件夹作为项目
+  const openFolder = async (folderPath, name) => {
     try {
-      const newProject = await apiClient.createProject(name, description)
-      setProjects(prev => [...prev, newProject])
+      const newProject = await apiClient.openFolder(folderPath, name)
+      setProjects(prev => {
+        // 检查是否已存在
+        const exists = prev.find(p => p.id === newProject.id)
+        if (exists) return prev
+        return [...prev, newProject]
+      })
       return newProject
     } catch (error) {
-      console.error('创建项目失败:', error)
+      console.error('打开文件夹失败:', error)
       throw error
     }
   }
 
-  // 删除项目
+  // 创建项目（废弃）
+  const createProject = async (name, description = '') => {
+    throw new Error('请使用 openFolder 方法打开文件夹')
+  }
+
+  // 从列表移除项目
   const deleteProject = async (projectId) => {
     try {
       await apiClient.deleteProject(projectId)
       setProjects(prev => prev.filter(p => p.id !== projectId))
     } catch (error) {
-      console.error('删除项目失败:', error)
+      console.error('移除项目失败:', error)
       throw error
     }
   }
@@ -208,7 +218,8 @@ export function ProjectProvider({ children }) {
   const value = {
     projects,
     loading,
-    createProject,
+    openFolder,
+    createProject, // 保留但会抛出错误
     deleteProject,
     updateProject,
     addImageToProject,
