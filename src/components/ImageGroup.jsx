@@ -8,11 +8,17 @@ export function ImageGroup({
   onUpdateGroup,
   onDeleteGroup,
   onPromptChange,
-  onDeleteImage
+  onDeleteImage,
+  onMoveToGroup,
+  onDrop,
+  draggable = false,
+  onDragStart,
+  onDragEnd
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDesc, setIsEditingDesc] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const handleTitleChange = (e) => {
     onUpdateGroup(group.id, { ...group, title: e.target.value })
@@ -28,8 +34,38 @@ export function ImageGroup({
     }
   }
 
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    
+    if (onDrop && group.id !== 'ungrouped') {
+      const imageId = e.dataTransfer.getData('imageId')
+      if (imageId) {
+        onDrop(group.id, imageId)
+      }
+    }
+  }
+
   return (
-    <div className="image-group">
+    <div 
+      className={`image-group ${isDragOver ? 'image-group--drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="image-group__header">
         <div className="image-group__title-section">
           <div className="image-group__title">
@@ -120,11 +156,17 @@ export function ImageGroup({
               projectId={projectId}
               onPromptChange={onPromptChange}
               onDelete={onDeleteImage}
+              onMoveToGroup={onMoveToGroup}
+              draggable={draggable}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
             />
           ))
         ) : (
           <div className="image-group__empty">
-            此分组还没有图片。上传图片后，可以将它们添加到此分组。
+            {group.id === 'ungrouped' 
+              ? '此分组还没有图片。上传图片后会显示在这里，你可以将它们移动到其他分组。'
+              : '此分组还没有图片。将未分组的图片拖拽到此处，或使用菜单移动图片到此分组。'}
           </div>
         )}
       </div>

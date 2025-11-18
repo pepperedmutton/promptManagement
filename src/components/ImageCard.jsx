@@ -2,7 +2,16 @@ import React, { useState } from 'react'
 import './ImageCard.css'
 import { useProjects } from '../contexts/ProjectContext'
 
-export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
+export function ImageCard({ 
+  image, 
+  projectId, 
+  onPromptChange, 
+  onDelete, 
+  onMoveToGroup,
+  draggable = false,
+  onDragStart,
+  onDragEnd
+}) {
   const { getImageUrl } = useProjects()
   const [copySuccess, setCopySuccess] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -31,6 +40,13 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
     }
   }
 
+  const handleMoveToGroup = () => {
+    if (onMoveToGroup) {
+      onMoveToGroup(image.id)
+      setMenuOpen(false)
+    }
+  }
+
   const toggleMenu = () => {
     setMenuOpen(prev => !prev)
   }
@@ -47,7 +63,16 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
   }, [menuOpen])
 
   return (
-    <div className={`image-card ${image.isOptimistic ? 'image-card--optimistic' : ''}`}>
+    <div 
+      className={`image-card ${image.isOptimistic ? 'image-card--optimistic' : ''}`}
+      draggable={draggable && !image.isOptimistic}
+      onDragStart={(e) => {
+        if (onDragStart) {
+          onDragStart(e, image.id)
+        }
+      }}
+      onDragEnd={onDragEnd}
+    >
       <div className="image-card__wrapper">
         {imageError ? (
           <div className="image-card__placeholder">加载失败</div>
@@ -78,6 +103,14 @@ export function ImageCard({ image, projectId, onPromptChange, onDelete }) {
           </button>
           {menuOpen && (
             <div className="image-card__menu-dropdown">
+              {onMoveToGroup && (
+                <button
+                  className="image-card__menu-item"
+                  onClick={handleMoveToGroup}
+                >
+                  📁 移动到分组
+                </button>
+              )}
               <button
                 className="image-card__menu-item image-card__menu-item--danger"
                 onClick={handleDelete}

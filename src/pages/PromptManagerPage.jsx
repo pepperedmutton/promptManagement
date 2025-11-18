@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '../contexts/ProjectContext'
 import { ImageCard } from '../components/ImageCard'
 import { ImageGroup } from '../components/ImageGroup'
+import { GroupSelector } from '../components/GroupSelector'
 import { Button } from '../components/Button'
 import { extractPngMetadata, extractPromptFromMetadata } from '../utils/pngMetadata'
+import { parsePageText, hasPageMarkers, getPageCount } from '../utils/textParser'
 import '../components/Button.css'
 import './PromptManagerPage.css'
 
@@ -20,11 +22,15 @@ export function PromptManagerPage() {
     canUndo,
     createImageGroup,
     updateImageGroup,
-    deleteImageGroup
+    deleteImageGroup,
+    addImageToGroup
   } = useProjects()
 
   const project = getProject(projectId)
   const pasteProcessingRef = useRef(false)
+  const [showGroupSelector, setShowGroupSelector] = useState(false)
+  const [selectedImageId, setSelectedImageId] = useState(null)
+  const [draggingImageId, setDraggingImageId] = useState(null)
 
   // 计算分组显示的数据
   const { groups, ungroupedImages } = useMemo(() => {
@@ -206,6 +212,99 @@ export function PromptManagerPage() {
     }
   }
 
+  const handleMoveToGroup = (imageId) => {
+    setSelectedImageId(imageId)
+    setShowGroupSelector(true)
+  }
+
+  const handleSelectGroup = async (groupId) => {
+    if (selectedImageId) {
+      try {
+        await addImageToGroup(projectId, groupId, selectedImageId)
+        console.log(`✓ 图片已移动到分组`)
+        setShowGroupSelector(false)
+        setSelectedImageId(null)
+      } catch (error) {
+        console.error('移动图片失败:', error)
+        alert('移动图片失败，请重试')
+      }
+    }
+  }
+
+  const handleDragStart = (e, imageId) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('imageId', imageId)
+    setDraggingImageId(imageId)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingImageId(null)
+  }
+
+  const handleDrop = async (groupId, imageId) => {
+    try {
+      await addImageToGroup(projectId, groupId, imageId)
+      console.log(`✓ 图片已拖拽到分组`)
+    } catch (error) {
+      console.error('移动图片失败:', error)
+      alert('移动图片失败，请重试')
+    }
+  }
+
+  // 处理txt文件导入
+  const handleImportText = async () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.txt'
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0]
+      if (!file) return
+      
+      try {
+        const text = await file.text()
+        
+        // 验证文件是否包含页码标记
+        if (!hasPageMarkers(text)) {
+          alert('未检测到页码标记（如"第一页"、"第1页"），请检查文件格式')
+          return
+        }
+        
+        // 解析文本获取分组
+        const parsedGroups = parsePageText(text)
+        const pageCount = getPageCount(text)
+        
+        if (parsedGroups.length === 0) {
+          alert('无法解析文件内容，请检查格式')
+          return
+        }
+        
+        // 确认导入
+        const confirmed = window.confirm(
+          `检测到 ${pageCount} 个页码标记，将创建 ${parsedGroups.length} 个分组。是否继续导入？`
+        )
+        
+        if (!confirmed) return
+        
+        // 批量创建分组
+        for (const groupData of parsedGroups) {
+          try {
+            await createImageGroup(projectId, groupData.title, groupData.description)
+          } catch (error) {
+            console.error(`创建分组"${groupData.title}"失败:`, error)
+          }
+        }
+        
+        alert(`✓ 成功导入 ${parsedGroups.length} 个分组`)
+      } catch (error) {
+        console.error('导入文件失败:', error)
+        alert('导入文件失败，请重试')
+      }
+    }
+    
+    input.click()
+  }
+
   return (
     <div className="prompt-manager-page">
       <header className="page-header">
@@ -249,6 +348,15 @@ export function PromptManagerPage() {
           onClick={handleCreateGroup}
         >
           ➕ 创建分组
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="small"
+          onClick={handleImportText}
+          title="导入包含分页标记的txt文件"
+        >
+          📄 导入文本
         </Button>
 
         <label htmlFor="image-upload" className="btn btn--primary btn--medium upload-label">
@@ -299,6 +407,11 @@ export function PromptManagerPage() {
                 onDeleteGroup={handleDeleteGroup}
                 onPromptChange={handlePromptChange}
                 onDeleteImage={handleDeleteImage}
+                onMoveToGroup={handleMoveToGroup}
+                onDrop={handleDrop}
+                draggable={true}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
               />
             ))}
             
@@ -308,7 +421,7 @@ export function PromptManagerPage() {
                 group={{
                   id: 'ungrouped',
                   title: '未分组的图片',
-                  description: '这些图片还未添加到任何分组中',
+                  description: '这些图片还未添加到任何分组中。你可以将它们拖拽到上面的分组，或使用菜单移动。',
                   images: ungroupedImages
                 }}
                 projectId={projectId}
@@ -316,11 +429,27 @@ export function PromptManagerPage() {
                 onDeleteGroup={() => {}}
                 onPromptChange={handlePromptChange}
                 onDeleteImage={handleDeleteImage}
+                onMoveToGroup={handleMoveToGroup}
+                draggable={true}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
               />
             )}
           </div>
         )}
       </main>
+
+      {/* 分组选择对话框 */}
+      {showGroupSelector && (
+        <GroupSelector
+          groups={groups}
+          onSelect={handleSelectGroup}
+          onClose={() => {
+            setShowGroupSelector(false)
+            setSelectedImageId(null)
+          }}
+        />
+      )}
     </div>
   )
 }
