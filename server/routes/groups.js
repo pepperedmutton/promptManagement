@@ -130,8 +130,8 @@ router.post('/:projectId/groups/:groupId/images', async (req, res) => {
       return res.status(404).json({ error: '分组不存在' });
     }
     
-    const group = project.imageGroups.find(g => g.id === groupId);
-    if (!group) {
+    const targetGroup = project.imageGroups.find(g => g.id === groupId);
+    if (!targetGroup) {
       return res.status(404).json({ error: '分组不存在' });
     }
     
@@ -141,14 +141,23 @@ router.post('/:projectId/groups/:groupId/images', async (req, res) => {
       return res.status(404).json({ error: '图片不存在' });
     }
     
-    // 添加图片到分组
-    if (!group.imageIds.includes(imageId)) {
-      group.imageIds.push(imageId);
-      group.updatedAt = new Date().toISOString();
-      await saveProjects(projects);
-      console.log(`✓ 添加图片 ${imageId} 到分组 ${group.title}`);
+    // 从所有其他分组中移除该图片（一张图片只能在一个分组中）
+    project.imageGroups.forEach(group => {
+      if (group.id !== groupId && group.imageIds.includes(imageId)) {
+        group.imageIds = group.imageIds.filter(id => id !== imageId);
+        group.updatedAt = new Date().toISOString();
+        console.log(`✓ 从分组 ${group.title} 移除图片 ${imageId}`);
+      }
+    });
+    
+    // 添加图片到目标分组
+    if (!targetGroup.imageIds.includes(imageId)) {
+      targetGroup.imageIds.push(imageId);
+      targetGroup.updatedAt = new Date().toISOString();
+      console.log(`✓ 添加图片 ${imageId} 到分组 ${targetGroup.title}`);
     }
     
+    await saveProjects(projects);
     res.json({ success: true });
   } catch (error) {
     console.error('添加图片到分组失败:', error);
