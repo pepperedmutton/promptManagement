@@ -351,6 +351,57 @@ export function ProjectProvider({ children }) {
     return apiClient.getImageUrl(projectId, filename, version)
   }
 
+  // 在指定位置插入分组
+  const insertImageGroup = async (projectId, afterGroupId) => {
+    try {
+      const project = projects.find(p => p.id === projectId);
+      if (!project) throw new Error('Project not found');
+
+      const pageGroups = (project.imageGroups || [])
+        .map(g => ({ ...g, pageNum: getPageNumber(g.title) }))
+        .filter(g => g.pageNum !== null)
+        .sort((a, b) => a.pageNum - b.pageNum);
+
+      let insertIndex = pageGroups.length;
+      if (afterGroupId) {
+        const afterGroupIndex = pageGroups.findIndex(g => g.id === afterGroupId);
+        if (afterGroupIndex !== -1) {
+          insertIndex = afterGroupIndex + 1;
+        }
+      }
+      
+      const newGroupTitle = `第 ${insertIndex + 1} 页`;
+
+      // Create the new group first
+      const newGroup = await apiClient.createImageGroup(projectId, newGroupTitle, '');
+
+      // Then, renumber all groups that should come after the new group
+      const updates = [];
+      for (let i = insertIndex; i < pageGroups.length; i++) {
+        updates.push({
+          groupId: pageGroups[i].id,
+          updates: { title: `第 ${i + 2} 页` }
+        });
+      }
+
+      if (updates.length > 0) {
+        console.log('✓ 插入新分组后，正在重新排序后续分组...');
+        for (const u of updates) {
+          await apiClient.updateImageGroup(projectId, u.groupId, u.updates);
+        }
+      }
+
+      // Manually trigger a state refresh
+      loadProjects();
+      return newGroup;
+
+    } catch (error) {
+      console.error('插入分组失败:', error);
+      loadProjects(); // Ensure consistency on error
+      throw error;
+    }
+  };
+
   // 创建图片分组
   const createImageGroup = async (projectId, title = '', description = '') => {
     try {
@@ -520,6 +571,7 @@ export function ProjectProvider({ children }) {
     canUndo: history.length > 0,
     // 分组管理
     createImageGroup,
+    insertImageGroup,
     updateImageGroup,
     deleteImageGroup,
     addImageToGroup,
