@@ -1,83 +1,163 @@
-# Stable Diffusion Prompt 管理器
+Prompt 管理工具# Stable Diffusion Prompt 管理器
 
-一个专业的前端应用，帮助你按项目组织和管理 Stable Diffusion 生成的图片及对应的 Prompt。
 
-## ✨ 功能特点
 
-### 项目管理
-- 📁 **多项目支持**：创建多个项目分类管理不同类型的图片
-- ✏️ **项目信息**：为每个项目添加名称和描述
-- 🗑️ **项目删除**：支持删除整个项目及其所有图片
+这是一个用于管理 Stable Diffusion / 图片项目的前端 + 后端小工具。它支持：一个专业的前端应用，帮助你按项目组织和管理 Stable Diffusion 生成的图片及对应的 Prompt。
 
-### Prompt 管理
+
+
+- 图片上传与展示（按时间/文件名）## ✨ 功能特点
+
+- 将图片组织到“分组”（分页 / 页面）并为分组添加说明
+
+- 双重移动图片方式：拖拽或通过图片菜单选择目标分组### 项目管理
+
+- 从包含“第X页”标记的文本文件批量导入分组内容- 📁 **多项目支持**：创建多个项目分类管理不同类型的图片
+
+- PNG 元数据（prompt）提取与保存- ✏️ **项目信息**：为每个项目添加名称和描述
+
+- 实时同步（WebSocket）用于多窗口/客户端协作- 🗑️ **项目删除**：支持删除整个项目及其所有图片
+
+
+
+快速开始### Prompt 管理
+
 - 🖼️ **图片上传**：支持批量上传多张图片
-- 📝 **Prompt 记录**：为每张图片添加和编辑对应的 prompt
+
+1) 安装依赖- 📝 **Prompt 记录**：为每张图片添加和编辑对应的 prompt
+
 - 🎨 **画廊展示**：响应式卡片布局，自动适配屏幕
-- 💾 **本地文件存储**：图片和 Prompt 保存在本地文件夹，通过文件监听实时同步到网页端
+
+在项目根目录（Windows PowerShell）：- 💾 **本地文件存储**：图片和 Prompt 保存在本地文件夹，通过文件监听实时同步到网页端
+
 - 📂 **文件夹同步**：外部修改文件夹内容会自动同步到网页
-- 🧩 **马赛克编辑**：内置图片打码工具，支持键盘快捷键翻页
 
-### 用户体验
+```powershell- 🧩 **马赛克编辑**：内置图片打码工具，支持键盘快捷键翻页
+
+npm install
+
+```### 用户体验
+
 - 🚀 **快速导航**：项目列表 ↔ Prompt 管理页面无缝切换
-- ⌨️ **键盘快捷键**：Ctrl+Z 撤销，← → 翻页，Ctrl+V 粘贴图片
+
+2) 启动开发环境- ⌨️ **键盘快捷键**：Ctrl+Z 撤销，← → 翻页，Ctrl+V 粘贴图片
+
 - 🎯 **直观操作**：清晰的 UI 设计，操作简单易懂
-- 📱 **响应式设计**：完美支持桌面和移动设备
 
-## 🏗️ 技术架构
+```powershell- 📱 **响应式设计**：完美支持桌面和移动设备
 
-### 技术栈
-- **React 18** — 现代化 UI 框架
-- **React Router v7** — 客户端路由
+npm start
+
+```## 🏗️ 技术架构
+
+
+
+这会并行启动：### 技术栈
+
+- 后端 HTTP + WebSocket 服务（默认 http://localhost:3001）- **React 18** — 现代化 UI 框架
+
+- Vite 前端开发服务器（默认 http://localhost:5173，若被占用会自动尝试其他端口）- **React Router v7** — 客户端路由
+
 - **Vite 5** — 快速开发服务器和构建工具
-- **Node.js + Express** — 模块化后端服务器
+
+主要页面与功能说明- **Node.js + Express** — 模块化后端服务器
+
 - **Chokidar** — 文件系统监听（100ms 轮询优化）
-- **WebSocket** — 实时数据同步（指数退避重连）
-- **pngjs** — PNG 元数据提取
 
-### 项目结构
+- 项目列表：管理多个项目。- **WebSocket** — 实时数据同步（指数退避重连）
 
-```
-src/
+- 项目页面（Prompt Manager）：- **pngjs** — PNG 元数据提取
+
+  - 图片卡片显示图片和其 prompt，支持复制与编辑。
+
+  - 分组（ImageGroup）：可编辑标题与说明；支持折叠。### 项目结构
+
+  - 拖放移动：直接将图片拖到目标分组（会有高亮提示）。
+
+  - 菜单移动：图片左上角三点菜单 → “移动到分组” → 选择目标分组。```
+
+  - 文本导入：点击页面顶部的“导入文本”按钮，上传包含“第X页”标记的 .txt 文件，系统会把每一页之间的内容解析为一个分组并创建。src/
+
 ├── components/          # 可复用 UI 组件
-│   ├── Button.jsx      # 按钮组件（支持多种样式）
+
+开发者说明│   ├── Button.jsx      # 按钮组件（支持多种样式）
+
 │   ├── ImageCard.jsx   # 图片卡片组件
-│   ├── Modal.jsx       # 模态框组件
-│   └── ProjectCard.jsx # 项目卡片组件
-├── contexts/           # React Context 状态管理
-│   └── ProjectContext.jsx  # 项目和图片状态管理
-├── pages/              # 页面组件
-│   ├── ProjectListPage.jsx    # 项目列表页
-│   └── PromptManagerPage.jsx  # Prompt 管理页
-├── styles/             # 全局样式
+
+- 主要目录│   ├── Modal.jsx       # 模态框组件
+
+  - `server/`：后端服务（Express）与路由（例如 `server/routes/groups.js`）。│   └── ProjectCard.jsx # 项目卡片组件
+
+  - `src/`：前端代码（React + Vite）。关键组件：├── contexts/           # React Context 状态管理
+
+    - `src/components/ImageCard.jsx`：单张图片的显示与操作。│   └── ProjectContext.jsx  # 项目和图片状态管理
+
+    - `src/components/ImageGroup.jsx`：分组容器，处理拖放目标逻辑。├── pages/              # 页面组件
+
+    - `src/components/GroupSelector.jsx`：选择分组的模态对话框。│   ├── ProjectListPage.jsx    # 项目列表页
+
+    - `src/utils/textParser.js`：.txt 文件解析（按“第X页”分割）。│   └── PromptManagerPage.jsx  # Prompt 管理页
+
+    - `src/contexts/ProjectContext.jsx`：项目数据管理与本地持久化接口。├── styles/             # 全局样式
+
 │   ├── variables.css   # CSS 变量（设计系统）
-│   └── global.css      # 全局样式和重置
-├── utils/              # 工具函数
-│   ├── helpers.js      # 日期格式化等工具函数
+
+- 数据一致性│   └── global.css      # 全局样式和重置
+
+  - 后端在添加图片到分组时会先从其它分组中移除该图片，确保一张图片只存在于一个分组中。├── utils/              # 工具函数
+
+  - 前端有相应的回调/乐观更新以保持界面与后端同步。│   ├── helpers.js      # 日期格式化等工具函数
+
 │   └── pngMetadata.js  # PNG 元数据提取
-├── api/                # API 客户端
+
+测试与示例├── api/                # API 客户端
+
 │   └── client.js       # 后端 API 通信和 WebSocket
-├── App.jsx             # 路由配置
+
+- 项目根目录下包含 `example-pages.txt`，示例说明了可以导入的文本格式（含“第一页/第1页”标记）。├── App.jsx             # 路由配置
+
 └── main.jsx            # 应用入口
 
+常见命令
+
 server/
-└── index.js            # Node.js 后端服务器
-```
+
+```powershell└── index.js            # Node.js 后端服务器
+
+# 安装依赖```
+
+npm install
 
 ### 设计模式
-- **Context API**：全局状态管理（项目和图片数据）
-- **WebSocket 实时同步**：文件变化自动推送到前端
+
+# 启动（开发模式）- **Context API**：全局状态管理（项目和图片数据）
+
+npm start- **WebSocket 实时同步**：文件变化自动推送到前端
+
 - **本地文件优先**：所有数据优先写入本地文件系统
-- **文件系统监听**：Chokidar 监听文件变化并自动同步
-- **组件化架构**：高度模块化，易于维护和扩展
-- **CSS 变量**：统一的设计系统（颜色、间距、阴影等）
 
-## 🚀 快速开始
+# 运行后端单独启动（在需要时）- **文件系统监听**：Chokidar 监听文件变化并自动同步
 
-### 桌面快捷方式
+cd server; node index.js- **组件化架构**：高度模块化，易于维护和扩展
+
+```- **CSS 变量**：统一的设计系统（颜色、间距、阴影等）
+
+
+
+问题与贡献## 🚀 快速开始
+
+
+
+欢迎用 Issues 或 Pull Requests 贡献改进。请遵循仓库的代码风格并保持变更小而明确。### 桌面快捷方式
+
 双击桌面上的 **"Prompt Management Tool"** 快捷方式即可启动应用。
 
+许可
+
 快捷方式将自动：
-1. 启动后端服务器 (http://localhost:3001)
+
+根据仓库原有许可（如无则按作者指定）。1. 启动后端服务器 (http://localhost:3001)
+
 2. 打开浏览器访问前端界面 (http://localhost:5173)
 
 #### 重新创建快捷方式

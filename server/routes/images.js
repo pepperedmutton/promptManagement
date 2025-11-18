@@ -136,8 +136,22 @@ router.delete('/:projectId/:imageId', async (req, res) => {
     const imagePath = path.join(project.folderPath, image.filename);
     const promptPath = path.join(project.folderPath, `${imageId}.txt`);
     
+    // 删除文件
     await fs.unlink(imagePath).catch(() => {});
     await fs.unlink(promptPath).catch(() => {});
+    
+    // 从所有分组中移除该图片的引用
+    if (project.imageGroups) {
+      project.imageGroups.forEach(group => {
+        if (group.imageIds && group.imageIds.includes(imageId)) {
+          group.imageIds = group.imageIds.filter(id => id !== imageId);
+          group.updatedAt = new Date().toISOString();
+          console.log(`✓ 从分组 ${group.title} 移除已删除的图片 ${imageId}`);
+        }
+      });
+      await saveProjects(projects);
+    }
+    
     console.log(`🗑️ 图片已删除 ${image.filename}`);
     
     res.json({ success: true });

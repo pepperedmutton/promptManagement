@@ -248,11 +248,19 @@ export function ProjectProvider({ children }) {
       }])
     }
     
-    // 立即从本地状态移除
+    // 立即从本地状态移除图片，并从所有分组中移除引用
     setProjects(prev =>
       prev.map(p =>
         p.id === projectId
-          ? { ...p, images: p.images.filter(img => img.id !== imageId) }
+          ? { 
+              ...p, 
+              images: p.images.filter(img => img.id !== imageId),
+              // 同时从所有分组中移除该图片的引用
+              imageGroups: (p.imageGroups || []).map(g => ({
+                ...g,
+                imageIds: (g.imageIds || []).filter(id => id !== imageId)
+              }))
+            }
           : p
       )
     )
@@ -397,17 +405,30 @@ export function ProjectProvider({ children }) {
   const addImageToGroup = async (projectId, groupId, imageId) => {
     try {
       await apiClient.addImageToGroup(projectId, groupId, imageId)
-      // WebSocket 会自动更新，这里可以选择乐观更新
+      // 乐观更新：从所有分组中移除该图片，然后添加到目标分组
       setProjects(prev =>
         prev.map(p =>
           p.id === projectId
             ? {
                 ...p,
-                imageGroups: (p.imageGroups || []).map(g =>
-                  g.id === groupId
-                    ? { ...g, imageIds: [...(g.imageIds || []), imageId] }
-                    : g
-                )
+                imageGroups: (p.imageGroups || []).map(g => {
+                  if (g.id === groupId) {
+                    // 目标分组：添加图片（如果还没有）
+                    const imageIds = g.imageIds || []
+                    return {
+                      ...g,
+                      imageIds: imageIds.includes(imageId) 
+                        ? imageIds 
+                        : [...imageIds, imageId]
+                    }
+                  } else {
+                    // 其他分组：移除该图片
+                    return {
+                      ...g,
+                      imageIds: (g.imageIds || []).filter(id => id !== imageId)
+                    }
+                  }
+                })
               }
             : p
         )
