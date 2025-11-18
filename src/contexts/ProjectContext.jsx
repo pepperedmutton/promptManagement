@@ -425,11 +425,10 @@ export function ProjectProvider({ children }) {
 
       if (renumberingNeeded) {
         console.log('✓ 页码需要重新排序，正在批量更新...');
-        // Perform batch update. Assuming apiClient has a method for this.
-        // If not, we'll have to do them one by one.
-        await Promise.all(
-          updates.map(u => apiClient.updateImageGroup(projectId, u.groupId, u.updates))
-        );
+        // Perform serial update to avoid race conditions
+        for (const u of updates) {
+          await apiClient.updateImageGroup(projectId, u.groupId, u.updates);
+        }
       }
 
       // Manually trigger a state refresh from the server to ensure consistency
