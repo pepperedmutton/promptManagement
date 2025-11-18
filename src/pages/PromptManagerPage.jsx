@@ -58,21 +58,26 @@ export function PromptManagerPage() {
 
   // 添加图片并尝试读取 PNG metadata
   const addImageWithMetadata = useCallback(async (file) => {
-    const imageData = await addImageToProject(projectId, file)
-    
-    // 如果是 PNG 文件，尝试提取 prompt
+    // 先提取 PNG metadata（如果是PNG文件）
+    let extractedPrompt = ''
     if (file.type === 'image/png') {
-      const metadata = await extractPngMetadata(file)
-      const prompt = extractPromptFromMetadata(metadata)
-      
-      if (prompt) {
-        // 自动填充 prompt
-        updateImagePrompt(projectId, imageData.id, prompt)
+      try {
+        const metadata = await extractPngMetadata(file)
+        const prompt = extractPromptFromMetadata(metadata)
+        if (prompt) {
+          extractedPrompt = prompt
+          console.log('✓ 从 PNG 提取到 prompt:', prompt.substring(0, 100) + '...')
+        }
+      } catch (error) {
+        console.error('提取 PNG metadata 失败:', error)
       }
     }
     
-    return imageData.id
-  }, [projectId, addImageToProject, updateImagePrompt])
+    // 上传图片，如果提取到了 prompt 就一起发送
+    const imageId = await addImageToProject(projectId, file, extractedPrompt)
+    
+    return imageId
+  }, [projectId, addImageToProject])
 
   // 处理图片上传（包含 PNG metadata 读取）
   const handleImageUpload = async (e) => {
