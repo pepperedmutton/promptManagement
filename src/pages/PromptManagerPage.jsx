@@ -6,7 +6,7 @@ import { ImageGroup } from '../components/ImageGroup'
 import { GroupSelector } from '../components/GroupSelector'
 import { Button } from '../components/Button'
 import { extractPngMetadata, extractPromptFromMetadata } from '../utils/pngMetadata'
-import { parsePageText, hasPageMarkers, getPageCount } from '../utils/textParser'
+import { parsePageText, hasPageMarkers, getPageCount, normalizeGroupTitle } from '../utils/textParser'
 import '../components/Button.css'
 import './PromptManagerPage.css'
 
@@ -188,7 +188,8 @@ export function PromptManagerPage() {
 
   const handleCreateGroup = async () => {
     try {
-      await createImageGroup(projectId, `第 ${(groups.length + 1)} 页`, '')
+      const newTitle = normalizeGroupTitle(`第 ${groups.length + 1} 页`);
+      await createImageGroup(projectId, newTitle, '')
     } catch (error) {
       console.error('创建分组失败:', error)
       alert('创建分组失败，请重试')
@@ -287,7 +288,9 @@ export function PromptManagerPage() {
         
         for (const groupData of parsedGroups) {
           try {
-            const existingGroup = groups.find(g => g.title === groupData.title)
+            // 标准化导入的标题和已有的标题进行比较
+            const normalizedImportTitle = normalizeGroupTitle(groupData.title);
+            const existingGroup = groups.find(g => normalizeGroupTitle(g.title) === normalizedImportTitle)
             
             if (existingGroup) {
               // 更新已有分组
@@ -362,9 +365,9 @@ export function PromptManagerPage() {
           variant="secondary"
           size="small"
           onClick={handleImportText}
-          title="导入包含分页标记的txt文件"
+          title="从txt文件导入剧本，自动按页创建或更新分组"
         >
-          📄 导入文本
+          📄 导入剧本
         </Button>
 
         <label htmlFor="image-upload" className="btn btn--primary btn--medium upload-label">

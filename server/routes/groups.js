@@ -1,5 +1,6 @@
 const express = require('express');
 const { loadProjects, saveProjects } = require('../services/storage');
+const { normalizeGroupTitle } = require('../utils/textUtils');
 
 const router = express.Router();
 
@@ -19,6 +20,15 @@ router.post('/:projectId/groups', async (req, res) => {
     // 初始化分组数组
     if (!project.imageGroups) {
       project.imageGroups = [];
+    }
+
+    // 标准化标题并检查是否存在同名分组
+    if (title) {
+      const normalizedTitle = normalizeGroupTitle(title);
+      const existingGroup = project.imageGroups.find(g => normalizeGroupTitle(g.title) === normalizedTitle);
+      if (existingGroup) {
+        return res.status(409).json({ error: `已存在名为 "${title}" 的分组` });
+      }
     }
     
     // 创建新分组
@@ -62,6 +72,17 @@ router.put('/:projectId/groups/:groupId', async (req, res) => {
     const groupIndex = project.imageGroups.findIndex(g => g.id === groupId);
     if (groupIndex === -1) {
       return res.status(404).json({ error: '分组不存在' });
+    }
+
+    // 如果要更新标题，检查是否与现有分组冲突
+    if (updates.title) {
+      const normalizedTitle = normalizeGroupTitle(updates.title);
+      const conflictingGroup = project.imageGroups.find(
+        g => g.id !== groupId && normalizeGroupTitle(g.title) === normalizedTitle
+      );
+      if (conflictingGroup) {
+        return res.status(409).json({ error: `已存在名为 "${updates.title}" 的分组` });
+      }
     }
     
     // 更新分组

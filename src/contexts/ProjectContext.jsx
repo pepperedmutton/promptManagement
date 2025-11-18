@@ -1,7 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { apiClient } from '../api/client'
+import { normalizeGroupTitle } from '../utils/textParser';
 
 const ProjectContext = createContext(null)
+
+// Helper to extract page number from a normalized title
+const getPageNumber = (title) => {
+  const match = normalizeGroupTitle(title).match(/第 (\d+) 页/);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return null;
+};
+
 
 export function ProjectProvider({ children }) {
   const [projects, setProjects] = useState([])
@@ -384,19 +395,50 @@ export function ProjectProvider({ children }) {
   // 删除分组
   const deleteImageGroup = async (projectId, groupId) => {
     try {
+      // Before doing anything, get the current project state
+      const project = projects.find(p => p.id === projectId);
+      if (!project) throw new Error('Project not found');
+
       await apiClient.deleteImageGroup(projectId, groupId)
-      setProjects(prev =>
-        prev.map(p =>
-          p.id === projectId
-            ? {
-                ...p,
-                imageGroups: (p.imageGroups || []).filter(g => g.id !== groupId)
-              }
-            : p
-        )
-      )
+
+      // After successful deletion, perform re-ordering logic
+      const remainingGroups = (project.imageGroups || []).filter(g => g.id !== groupId);
+
+      const pageGroups = remainingGroups
+        .map(g => ({ ...g, pageNum: getPageNumber(g.title) }))
+        .filter(g => g.pageNum !== null)
+        .sort((a, b) => a.pageNum - b.pageNum);
+
+      const updates = [];
+      let renumberingNeeded = false;
+
+      pageGroups.forEach((group, index) => {
+        const expectedPageNum = index + 1;
+        if (group.pageNum !== expectedPageNum) {
+          renumberingNeeded = true;
+          updates.push({ 
+            groupId: group.id, 
+            updates: { title: `第 ${expectedPageNum} 页` } 
+          });
+        }
+      });
+
+      if (renumberingNeeded) {
+        console.log('✓ 页码需要重新排序，正在批量更新...');
+        // Perform batch update. Assuming apiClient has a method for this.
+        // If not, we'll have to do them one by one.
+        await Promise.all(
+          updates.map(u => apiClient.updateImageGroup(projectId, u.groupId, u.updates))
+        );
+      }
+
+      // Manually trigger a state refresh from the server to ensure consistency
+      loadProjects();
+
     } catch (error) {
       console.error('删除分组失败:', error)
+      // Manually trigger a state refresh from the server to ensure consistency
+      loadProjects();
       throw error
     }
   }
