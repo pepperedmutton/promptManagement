@@ -257,13 +257,3 @@ npm run dev     # 同 npm start
 3. 自定义打包：可将 `start-app.bat` 配合 `npm install --production` 一起打包给非技术用户；
 4. 测试策略：暂未集成自动化测试，建议通过 `example-pages.txt`、手工上传、马赛克流程回归；
 5. 代码规范：以函数式 React Hooks + Context 为主，CSS 走 BEM + 全局变量，新增组件请放在 `src/components` 并附带 CSS。
-
----
-
-## 贡献与许可
-
-- 欢迎通过 Issues / PR 反馈：例如补充多语言、增加批量操作、引入搜索 & 过滤器等；
-- 贡献建议：保持变更聚焦、遵循现有目录结构，后端注意不要阻塞文件监听；
-- 许可：MIT License，允许个人/商业使用与再发布（请保留版权声明）。
-
-如果你打算在 BOOTH、DLsite、Gumroad 等平台售卖，可直接引用本文档，补充你的产品页截图与定价说明即可。祝创作顺利 🎨
