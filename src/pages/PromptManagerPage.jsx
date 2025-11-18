@@ -264,38 +264,46 @@ export function PromptManagerPage() {
       try {
         const text = await file.text()
         
-        // 验证文件是否包含页码标记
         if (!hasPageMarkers(text)) {
           alert('未检测到页码标记（如"第一页"、"第1页"），请检查文件格式')
           return
         }
         
-        // 解析文本获取分组
         const parsedGroups = parsePageText(text)
-        const pageCount = getPageCount(text)
         
         if (parsedGroups.length === 0) {
-          alert('无法解析文件内容，请检查格式')
+          alert('无法解析文件内容或内容过短，请检查格式')
           return
         }
         
-        // 确认导入
         const confirmed = window.confirm(
-          `检测到 ${pageCount} 个页码标记，将创建 ${parsedGroups.length} 个分组。是否继续导入？`
+          `检测到 ${parsedGroups.length} 个有效页面内容，将更新或创建对应的分组。是否继续？`
         )
         
         if (!confirmed) return
         
-        // 批量创建分组
+        let updatedCount = 0
+        let createdCount = 0
+        
         for (const groupData of parsedGroups) {
           try {
-            await createImageGroup(projectId, groupData.title, groupData.description)
+            const existingGroup = groups.find(g => g.title === groupData.title)
+            
+            if (existingGroup) {
+              // 更新已有分组
+              await updateImageGroup(projectId, existingGroup.id, { description: groupData.description })
+              updatedCount++
+            } else {
+              // 创建新分组
+              await createImageGroup(projectId, groupData.title, groupData.description)
+              createdCount++
+            }
           } catch (error) {
-            console.error(`创建分组"${groupData.title}"失败:`, error)
+            console.error(`处理分组"${groupData.title}"失败:`, error)
           }
         }
         
-        alert(`✓ 成功导入 ${parsedGroups.length} 个分组`)
+        alert(`✓ 导入完成！\n- ${updatedCount} 个分组已更新\n- ${createdCount} 个分组已创建`)
       } catch (error) {
         console.error('导入文件失败:', error)
         alert('导入文件失败，请重试')
