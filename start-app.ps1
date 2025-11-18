@@ -2,9 +2,28 @@
 Write-Host "Starting Prompt Management Tool..." -ForegroundColor Green
 Write-Host ""
 
+# Ensure dependencies are installed
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+Write-Host "Checking npm dependencies..." -ForegroundColor Cyan
+if (-not (Test-Path (Join-Path $projectRoot 'node_modules'))) {
+    Write-Host "Installing dependencies (npm install)..." -ForegroundColor Yellow
+    Push-Location $projectRoot
+    npm install
+    $installExitCode = $LASTEXITCODE
+    Pop-Location
+
+    if ($installExitCode -ne 0) {
+        Write-Host "Dependency installation failed. Please review the logs above." -ForegroundColor Red
+        Read-Host
+        exit 1
+    }
+} else {
+    Write-Host "Dependencies already installed." -ForegroundColor DarkGreen
+}
+
 # Start the backend server in background
 $serverJob = Start-Job -ScriptBlock {
-    Set-Location $using:PWD
+    Set-Location $using:projectRoot
     npm run server
 }
 

@@ -130,7 +130,7 @@ npm run dev     # 同 npm start
    - 触发 `setupFileWatcher()` 监听新目录。
 4. 项目列表展示图片数量、最近更新时间等，点击卡片即可进入 Prompt Manager。
 
-> 删除项目只会从列表移除，不会删除磁盘文件。
+> 删除项目会直接删除其绑定文件夹内的所有图片与 prompt，请操作前做好备份。
 
 ### 2. 上传 / 粘贴 / 管理 Prompt
 - 通过顶部 **“📁 上传图片”** 或空态按钮选择多张图片；
@@ -196,7 +196,7 @@ npm run dev     # 同 npm start
 | `GET /api/projects` | 获取所有项目（含图片、分组、元数据） |
 | `POST /api/projects/open-folder` | 绑定文件夹为项目，扫描现有图片 |
 | `PUT /api/projects/:projectId` | 更新项目名称、路径等 |
-| `DELETE /api/projects/:projectId` | 从应用中移除项目（不删文件） |
+| `DELETE /api/projects/:projectId` | 删除项目并移除其绑定文件夹下的所有图片/Prompt |
 | `POST /api/projects/:projectId/groups` | 创建分组 |
 | `PUT /api/projects/:projectId/groups/:groupId` | 更新分组标题/描述 |
 | `DELETE /api/projects/:projectId/groups/:groupId` | 删除分组 |

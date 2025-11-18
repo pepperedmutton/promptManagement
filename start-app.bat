@@ -6,6 +6,19 @@ echo.
 echo Starting servers...
 echo.
 
+REM Ensure dependencies are installed before launching
+if not exist "node_modules\" (
+    echo Installing npm dependencies...
+    call npm install
+    if errorlevel 1 (
+        echo Failed to install dependencies. Please check the logs above.
+        pause
+        exit /b 1
+    )
+) else (
+    echo Dependencies already installed.
+)
+
 REM Kill any existing Node processes to avoid port conflicts
 taskkill /F /IM node.exe > nul 2>&1
 
