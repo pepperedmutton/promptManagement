@@ -332,6 +332,116 @@ export function ProjectProvider({ children }) {
     return apiClient.getImageUrl(projectId, filename, version)
   }
 
+  // 创建图片分组
+  const createImageGroup = async (projectId, title = '', description = '') => {
+    try {
+      const group = await apiClient.createImageGroup(projectId, title, description)
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? { ...p, imageGroups: [...(p.imageGroups || []), group] }
+            : p
+        )
+      )
+      return group
+    } catch (error) {
+      console.error('创建分组失败:', error)
+      throw error
+    }
+  }
+
+  // 更新分组信息
+  const updateImageGroup = async (projectId, groupId, updates) => {
+    try {
+      const updatedGroup = await apiClient.updateImageGroup(projectId, groupId, updates)
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                imageGroups: (p.imageGroups || []).map(g =>
+                  g.id === groupId ? updatedGroup : g
+                )
+              }
+            : p
+        )
+      )
+      return updatedGroup
+    } catch (error) {
+      console.error('更新分组失败:', error)
+      throw error
+    }
+  }
+
+  // 删除分组
+  const deleteImageGroup = async (projectId, groupId) => {
+    try {
+      await apiClient.deleteImageGroup(projectId, groupId)
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                imageGroups: (p.imageGroups || []).filter(g => g.id !== groupId)
+              }
+            : p
+        )
+      )
+    } catch (error) {
+      console.error('删除分组失败:', error)
+      throw error
+    }
+  }
+
+  // 添加图片到分组
+  const addImageToGroup = async (projectId, groupId, imageId) => {
+    try {
+      await apiClient.addImageToGroup(projectId, groupId, imageId)
+      // WebSocket 会自动更新，这里可以选择乐观更新
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                imageGroups: (p.imageGroups || []).map(g =>
+                  g.id === groupId
+                    ? { ...g, imageIds: [...(g.imageIds || []), imageId] }
+                    : g
+                )
+              }
+            : p
+        )
+      )
+    } catch (error) {
+      console.error('添加图片到分组失败:', error)
+      throw error
+    }
+  }
+
+  // 从分组移除图片
+  const removeImageFromGroup = async (projectId, groupId, imageId) => {
+    try {
+      await apiClient.removeImageFromGroup(projectId, groupId, imageId)
+      setProjects(prev =>
+        prev.map(p =>
+          p.id === projectId
+            ? {
+                ...p,
+                imageGroups: (p.imageGroups || []).map(g =>
+                  g.id === groupId
+                    ? { ...g, imageIds: (g.imageIds || []).filter(id => id !== imageId) }
+                    : g
+                )
+              }
+            : p
+        )
+      )
+    } catch (error) {
+      console.error('从分组移除图片失败:', error)
+      throw error
+    }
+  }
+
   const value = {
     projects,
     loading,
@@ -345,7 +455,13 @@ export function ProjectProvider({ children }) {
     getProject,
     getImageUrl,
     undo,
-    canUndo: history.length > 0
+    canUndo: history.length > 0,
+    // 分组管理
+    createImageGroup,
+    updateImageGroup,
+    deleteImageGroup,
+    addImageToGroup,
+    removeImageFromGroup
   }
 
   return (

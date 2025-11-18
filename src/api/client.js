@@ -184,6 +184,57 @@ class ApiClient {
     const cacheBuster = version ? `?v=${encodeURIComponent(version)}` : '';
     return `http://localhost:3001/images/${projectId}/${filename}${cacheBuster}`;
   }
+
+  // 创建图片分组
+  async createImageGroup(projectId, title = '', description = '') {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/groups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description })
+    });
+    if (!response.ok) throw new Error('创建分组失败');
+    return response.json();
+  }
+
+  // 更新分组
+  async updateImageGroup(projectId, groupId, updates) {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/groups/${groupId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!response.ok) throw new Error('更新分组失败');
+    return response.json();
+  }
+
+  // 删除分组
+  async deleteImageGroup(projectId, groupId) {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/groups/${groupId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('删除分组失败');
+    return response.json();
+  }
+
+  // 添加图片到分组
+  async addImageToGroup(projectId, groupId, imageId) {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/groups/${groupId}/images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId })
+    });
+    if (!response.ok) throw new Error('添加图片到分组失败');
+    return response.json();
+  }
+
+  // 从分组移除图片
+  async removeImageFromGroup(projectId, groupId, imageId) {
+    const response = await fetch(`${API_BASE}/projects/${projectId}/groups/${groupId}/images/${imageId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('从分组移除图片失败');
+    return response.json();
+  }
 }
 
 export const apiClient = new ApiClient();

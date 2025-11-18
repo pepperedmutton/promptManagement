@@ -12,6 +12,7 @@ const { initWebSocketServer, broadcast } = require('./services/websocket');
 const projectsRouter = require('./routes/projects');
 const imagesRouter = require('./routes/images');
 const foldersRouter = require('./routes/folders');
+const groupsRouter = require('./routes/groups');
 
 // 导入中间件
 const { errorHandler, requestLogger, notFoundHandler } = require('./middleware');
@@ -44,6 +45,7 @@ app.get('/images/:projectId/:filename', async (req, res) => {
 
 // API 路由挂载
 app.use('/api/projects', projectsRouter);
+app.use('/api/projects', groupsRouter);  // 分组路由也挂载到 /api/projects
 app.use('/api/images', imagesRouter);
 app.use('/api', foldersRouter);  // 挂载到 /api，因为 foldersRouter 内部定义了 /select-folder
 

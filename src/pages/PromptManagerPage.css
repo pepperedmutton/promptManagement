@@ -1,8 +1,8 @@
 .prompt-manager-page {
   min-height: 100vh;
   padding: var(--spacing-xl);
-  max-width: 1400px;
-  margin: 0 auto;
+  /* 移除最大宽度限制，让内容填满整个页面 */
+  margin: 0;
 }
 
 .page-header {
@@ -40,9 +40,10 @@
 }
 
 .image-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  /* 不再使用网格布局，改为纵向分组布局 */
 }
 
 .empty-state {

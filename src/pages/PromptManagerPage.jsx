@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjects } from '../contexts/ProjectContext'
 import { ImageCard } from '../components/ImageCard'
+import { ImageGroup } from '../components/ImageGroup'
 import { Button } from '../components/Button'
 import { extractPngMetadata, extractPromptFromMetadata } from '../utils/pngMetadata'
 import '../components/Button.css'
@@ -16,11 +17,44 @@ export function PromptManagerPage() {
     updateImagePrompt,
     deleteImage,
     undo,
-    canUndo
+    canUndo,
+    createImageGroup,
+    updateImageGroup,
+    deleteImageGroup
   } = useProjects()
 
   const project = getProject(projectId)
   const pasteProcessingRef = useRef(false)
+
+  // 计算分组显示的数据
+  const { groups, ungroupedImages } = useMemo(() => {
+    if (!project) return { groups: [], ungroupedImages: [] }
+
+    const imageGroups = project.imageGroups || []
+    const allImages = project.images || []
+    
+    // 获取所有已分组的图片ID
+    const groupedImageIds = new Set()
+    imageGroups.forEach(group => {
+      (group.imageIds || []).forEach(id => groupedImageIds.add(id))
+    })
+    
+    // 为每个分组附加完整的图片对象
+    const groupsWithImages = imageGroups.map(group => ({
+      ...group,
+      images: (group.imageIds || [])
+        .map(id => allImages.find(img => img.id === id))
+        .filter(Boolean) // 过滤掉不存在的图片
+    }))
+    
+    // 未分组的图片
+    const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
+    
+    return {
+      groups: groupsWithImages,
+      ungroupedImages: ungrouped
+    }
+  }, [project])
 
   // 添加图片并尝试读取 PNG metadata
   const addImageWithMetadata = useCallback(async (file) => {
@@ -141,6 +175,32 @@ export function PromptManagerPage() {
     navigate(`/projects/${projectId}/mosaic/${targetImageId}`)
   }
 
+  const handleCreateGroup = async () => {
+    try {
+      await createImageGroup(projectId, `第 ${(groups.length + 1)} 页`, '')
+    } catch (error) {
+      console.error('创建分组失败:', error)
+      alert('创建分组失败，请重试')
+    }
+  }
+
+  const handleUpdateGroup = async (groupId, updatedGroup) => {
+    try {
+      await updateImageGroup(projectId, groupId, updatedGroup)
+    } catch (error) {
+      console.error('更新分组失败:', error)
+    }
+  }
+
+  const handleDeleteGroup = async (groupId) => {
+    try {
+      await deleteImageGroup(projectId, groupId)
+    } catch (error) {
+      console.error('删除分组失败:', error)
+      alert('删除分组失败，请重试')
+    }
+  }
+
   return (
     <div className="prompt-manager-page">
       <header className="page-header">
@@ -176,6 +236,14 @@ export function PromptManagerPage() {
           disabled={project.images.length === 0}
         >
           🧩 马赛克模式
+        </Button>
+
+        <Button
+          variant="primary"
+          size="small"
+          onClick={handleCreateGroup}
+        >
+          ➕ 创建分组
         </Button>
 
         <label htmlFor="image-upload" className="btn btn--primary btn--medium upload-label">
@@ -216,15 +284,35 @@ export function PromptManagerPage() {
           </div>
         ) : (
           <div className="image-gallery">
-            {project.images.map(image => (
-              <ImageCard
-                key={image.id}
-                image={image}
+            {/* 显示所有分组 */}
+            {groups.map(group => (
+              <ImageGroup
+                key={group.id}
+                group={group}
                 projectId={projectId}
+                onUpdateGroup={handleUpdateGroup}
+                onDeleteGroup={handleDeleteGroup}
                 onPromptChange={handlePromptChange}
-                onDelete={handleDeleteImage}
+                onDeleteImage={handleDeleteImage}
               />
             ))}
+            
+            {/* 未分组的图片 */}
+            {ungroupedImages.length > 0 && (
+              <ImageGroup
+                group={{
+                  id: 'ungrouped',
+                  title: '未分组的图片',
+                  description: '这些图片还未添加到任何分组中',
+                  images: ungroupedImages
+                }}
+                projectId={projectId}
+                onUpdateGroup={() => {}}
+                onDeleteGroup={() => {}}
+                onPromptChange={handlePromptChange}
+                onDeleteImage={handleDeleteImage}
+              />
+            )}
           </div>
         )}
       </main>
