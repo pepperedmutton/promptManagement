@@ -13,7 +13,9 @@ export function ImageGroup({
   onDrop,
   draggable = false,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  onMouseEnter,
+  onMouseLeave
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -51,7 +53,7 @@ export function ImageGroup({
     e.stopPropagation()
     setIsDragOver(false)
     
-    if (onDrop && group.id !== 'ungrouped') {
+    if (onDrop) {
       const imageId = e.dataTransfer.getData('imageId')
       if (imageId) {
         onDrop(group.id, imageId)
@@ -65,6 +67,8 @@ export function ImageGroup({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className="image-group__header">
         <div className="image-group__title-section">
@@ -103,10 +107,8 @@ export function ImageGroup({
 
 例如：
 ———————— 第1页：日常出场 + 身材印象 ————————
-功能：介绍女主是正常少女...
+功能：介绍女主是正常少女..."
 
-コマ1（上横）
-内容：清晨街道/校园远景..."
               autoFocus
             />
           ) : group.description ? (

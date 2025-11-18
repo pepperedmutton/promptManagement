@@ -3,15 +3,20 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const chokidar = require('chokidar');
 const { loadProjects, saveProjects } = require('./storage');
+const Debouncer = require('../utils/Debouncer');
 
 let watcher = null;
-let syncTimeout = null;
-let isSyncing = false;
 let broadcastCallback = null;
+let fileWatcherDebouncer = null;
 
 // 设置广播回调
 function setBroadcastCallback(callback) {
   broadcastCallback = callback;
+}
+
+// 设置防抖器实例
+function setFileWatcherDebouncer(debouncer) {
+  fileWatcherDebouncer = debouncer;
 }
 
 // 扫描项目文件夹
@@ -78,21 +83,11 @@ async function setupFileWatcher() {
       },
       atomic: true
     });
-    
+
     watcher
-      .on('add', async (filePath) => {
-        console.log(`✓ 文件添加: ${path.basename(filePath)}`);
-        await syncFileSystem();
-      })
-      .on('unlink', async (filePath) => {
-        console.log(`✓ 文件删除: ${path.basename(filePath)}`);
-        await syncFileSystem();
-      })
-      .on('change', async (filePath) => {
-        if (filePath.endsWith('.txt')) {
-          console.log(`✓ Prompt 更新: ${path.basename(filePath)}`);
-          await syncFileSystem();
-        }
+      .on('all', (event, filePath) => {
+        console.log(`[${event}] ${path.basename(filePath)}`);
+        fileWatcherDebouncer.trigger(() => syncFileSystem());
       });
     
     console.log(`✓ 正在监听 ${folders.length} 个文件夹`);
@@ -102,25 +97,14 @@ async function setupFileWatcher() {
   return updateWatcher;
 }
 
-// 同步文件系统（带防抖）
+// 同步文件系统
 async function syncFileSystem() {
-  if (isSyncing) {
-    console.log('⏳ 同步进行中，跳过本次触发');
-    return;
+  console.log('🚀 Starting file system sync...');
+  try {
+    await performSync();
+  } catch (error) {
+    console.error('Sync failed:', error);
   }
-  
-  if (syncTimeout) {
-    clearTimeout(syncTimeout);
-  }
-  
-  syncTimeout = setTimeout(async () => {
-    isSyncing = true;
-    try {
-      await performSync();
-    } finally {
-      isSyncing = false;
-    }
-  }, 50);
 }
 
 // 执行实际同步
@@ -192,7 +176,7 @@ async function performSync() {
             hasChanges = true;
           }
         } catch {
-          // 文件可能暂时不可访问，交给后续删除流程处�?
+          // 文件可能暂时不可访问，交给后续删除流程处理
         }
 
         try {
@@ -218,6 +202,8 @@ async function performSync() {
       if (broadcastCallback) {
         broadcastCallback({ type: 'projects-updated' });
       }
+    } else {
+      console.log('ℹ️ No changes detected during sync.');
     }
   } catch (error) {
     console.error('同步文件系统失败:', error);
@@ -229,5 +215,6 @@ module.exports = {
   setupFileWatcher,
   syncFileSystem,
   performSync,
-  setBroadcastCallback
+  setBroadcastCallback,
+  setFileWatcherDebouncer
 };

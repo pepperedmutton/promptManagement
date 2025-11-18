@@ -67,16 +67,26 @@ router.post('/:projectId', upload.single('image'), async (req, res) => {
     }
     
     const now = new Date().toISOString();
+    const newImage = {
+      id: imageId,
+      filename,
+      mime: file.mimetype,
+      prompt,
+      addedAt: now,
+      updatedAt: now
+    };
+
+    // 将新图片添加到项目数据库
+    if (!project.images) {
+      project.images = [];
+    }
+    project.images.push(newImage);
+    await saveProjects(projects);
+    console.log(`✓ 图片 ${filename} 已添加到项目数据库`);
+
     res.json({
       success: true,
-      image: {
-        id: imageId,
-        filename,
-        mime: file.mimetype,
-        prompt,
-        addedAt: now,
-        updatedAt: now
-      }
+      image: newImage
     });
   } catch (error) {
     console.error('添加图片失败:', error);

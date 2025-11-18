@@ -21,6 +21,7 @@ export function PromptManagerPage() {
     undo,
     canUndo,
     createImageGroup,
+    insertImageGroup,
     updateImageGroup,
     deleteImageGroup,
     addImageToGroup
@@ -31,6 +32,8 @@ export function PromptManagerPage() {
   const [showGroupSelector, setShowGroupSelector] = useState(false)
   const [selectedImageId, setSelectedImageId] = useState(null)
   const [draggingImageId, setDraggingImageId] = useState(null)
+  const [showInsertSelector, setShowInsertSelector] = useState(false);
+  const [hoveredGroupId, setHoveredGroupId] = useState(null);
 
   // 计算分组显示的数据
   const { groups, ungroupedImages } = useMemo(() => {
@@ -56,8 +59,14 @@ export function PromptManagerPage() {
     // 未分组的图片
     const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
     
+    // Sort groups by page number
+    const sortedGroups = groupsWithImages
+      .map(g => ({ ...g, pageNum: parseInt((g.title.match(/第 (\d+) 页/) || [])[1], 10) }))
+      .filter(g => !isNaN(g.pageNum))
+      .sort((a, b) => a.pageNum - b.pageNum);
+
     return {
-      groups: groupsWithImages,
+      groups: sortedGroups,
       ungroupedImages: ungrouped
     }
   }, [project])
@@ -134,14 +143,24 @@ export function PromptManagerPage() {
           const file = item.getAsFile()
           if (file) {
             try {
-              await addImageWithMetadata(file)
-              console.log('图片粘贴完成')
+              // 1. 先将图片正常添加到项目（未分组区域）
+              const newImage = await addImageWithMetadata(file);
+              console.log('图片粘贴完成，已添加到未分组区域');
+
+              // 2. 如果鼠标正悬停在一个有效的分组上，则立即将其移动到该分组
+              if (newImage && hoveredGroupId && hoveredGroupId !== 'ungrouped') {
+                console.log(`✓ 检测到悬停分组，立即移动图片到: ${hoveredGroupId}`);
+                await addImageToGroup(projectId, hoveredGroupId, newImage.id);
+                console.log(`✓ 图片已成功移动到分组`);
+              }
+
             } catch (error) {
-              console.error('粘贴图片失败:', error)
+              console.error('粘贴并移动图片失败:', error)
+              alert(`粘贴图片失败: ${error.message}`);
             }
           }
           
-          // 500ms 后重置标志
+          // 1秒后重置标志
           setTimeout(() => {
             pasteProcessingRef.current = false
             console.log('粘贴处理标志已重置')
@@ -156,7 +175,7 @@ export function PromptManagerPage() {
     return () => {
       window.removeEventListener('paste', handlePaste, true)
     }
-  }, [addImageWithMetadata])
+  }, [addImageWithMetadata, hoveredGroupId, addImageToGroup, projectId])
 
   if (!project) {
     return (
@@ -188,13 +207,30 @@ export function PromptManagerPage() {
 
   const handleCreateGroup = async () => {
     try {
-      const newTitle = normalizeGroupTitle(`第 ${groups.length + 1} 页`);
+      const pageGroups = groups.filter(g => g.title.match(/第 (\d+) 页/));
+      const nextNum = pageGroups.length + 1;
+      const newTitle = `第 ${nextNum} 页`;
       await createImageGroup(projectId, newTitle, '')
     } catch (error) {
       console.error('创建分组失败:', error)
       alert('创建分组失败，请重试')
     }
   }
+
+  const handleInsertGroup = () => {
+    setShowInsertSelector(true);
+  };
+
+  const handleSelectInsertLocation = async (afterGroupId) => {
+    try {
+      await insertImageGroup(projectId, afterGroupId);
+    } catch (error) {
+      console.error('插入分组失败:', error);
+      alert('插入分组失败，请重试');
+    } finally {
+      setShowInsertSelector(false);
+    }
+  };
 
   const handleUpdateGroup = async (groupId, updatedGroup) => {
     try {
@@ -358,7 +394,15 @@ export function PromptManagerPage() {
           size="small"
           onClick={handleCreateGroup}
         >
-          ➕ 创建分组
+          ➕ 新建分组
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="small"
+          onClick={handleInsertGroup}
+        >
+          ↳ 插入分组
         </Button>
 
         <Button
@@ -423,6 +467,8 @@ export function PromptManagerPage() {
                 draggable={true}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                onMouseEnter={() => setHoveredGroupId(group.id)}
+                onMouseLeave={() => setHoveredGroupId(null)}
               />
             ))}
             
@@ -444,6 +490,8 @@ export function PromptManagerPage() {
                 draggable={true}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                onMouseEnter={() => setHoveredGroupId('ungrouped')}
+                onMouseLeave={() => setHoveredGroupId(null)}
               />
             )}
           </div>
@@ -459,6 +507,17 @@ export function PromptManagerPage() {
             setShowGroupSelector(false)
             setSelectedImageId(null)
           }}
+        />
+      )}
+
+      {/* 插入位置选择对话框 */}
+      {showInsertSelector && (
+        <GroupSelector
+          groups={[{ id: 'start', title: '在所有分组之前' }, ...groups]}
+          onSelect={handleSelectInsertLocation}
+          onClose={() => setShowInsertSelector(false)}
+          title="选择插入位置"
+          selectButtonText="在此之后插入"
         />
       )}
     </div>

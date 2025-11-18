@@ -2,10 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
+const Debouncer = require('./utils/Debouncer');
 
 // 导入服务模块
 const { initDataDir, loadProjects } = require('./services/storage');
-const { setupFileWatcher, setBroadcastCallback, syncFileSystem } = require('./services/fileWatcher');
+const { setupFileWatcher, setBroadcastCallback, syncFileSystem, setFileWatcherDebouncer } = require('./services/fileWatcher');
 const { initWebSocketServer, broadcast } = require('./services/websocket');
 
 // 导入路由模块
@@ -16,9 +17,16 @@ const groupsRouter = require('./routes/groups');
 
 // 导入中间件
 const { errorHandler, requestLogger, notFoundHandler } = require('./middleware');
+const { apiWriteLock } = require('./middleware/apiWriteLock');
 
 const app = express();
 const PORT = 3001;
+
+// 初始化防抖器
+const fileWatcherDebouncer = new Debouncer(350); 
+
+// 全局状态
+global.isApiWriting = false;
 
 // 中间件配置
 app.use(cors());
@@ -44,10 +52,11 @@ app.get('/images/:projectId/:filename', async (req, res) => {
 });
 
 // API 路由挂载
-app.use('/api/projects', projectsRouter);
-app.use('/api/projects', groupsRouter);  // 分组路由也挂载到 /api/projects
-app.use('/api/images', imagesRouter);
-app.use('/api', foldersRouter);  // 挂载到 /api，因为 foldersRouter 内部定义了 /select-folder
+const lock = apiWriteLock(fileWatcherDebouncer);
+app.use('/api/projects', lock, projectsRouter);
+app.use('/api/projects', lock, groupsRouter);
+app.use('/api/images', lock, imagesRouter);
+app.use('/api', foldersRouter);
 
 // 更新文件监听器的端点
 app.post('/api/update-watcher', async (req, res) => {
@@ -85,14 +94,17 @@ async function start() {
     // 4. 设置 WebSocket 广播回调
     setBroadcastCallback(broadcast);
     
-    // 5. 设置文件监听器
+    // 5. 注入防抖器到文件监听器模块
+    setFileWatcherDebouncer(fileWatcherDebouncer);
+
+    // 6. 设置文件监听器
     global.updateWatcher = await setupFileWatcher();
     console.log('✓ 文件监听器初始化完成');
     
-    // 6. 启动时同步一次
+    // 7. 启动时同步一次
     await syncFileSystem();
     
-    // 7. 启动 HTTP 服务器
+    // 8. 启动 HTTP 服务器
     server.listen(PORT, () => {
       console.log('========================================');
       console.log('  Prompt 管理工具 - 后端服务');

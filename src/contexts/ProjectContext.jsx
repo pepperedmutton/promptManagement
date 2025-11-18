@@ -91,78 +91,21 @@ export function ProjectProvider({ children }) {
     }
   }
 
-  // 添加图片到项目（乐观更新）
+  // 添加图片到项目
   const addImageToProject = async (projectId, file, prompt = '') => {
-    // 生成临时 ID 和 blob URL 用于立即预览
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    const blobUrl = URL.createObjectURL(file)
-    
-    const now = new Date().toISOString()
-    const tempImage = {
-      id: tempId,
-      filename: file.name,
-      mime: file.type,
-      prompt: prompt || '',
-      addedAt: now,
-      updatedAt: now,
-      isOptimistic: true, // 标记为乐观更新
-      previewUrl: blobUrl  // 临时预览 URL
-    }
-    
-    // 立即更新本地状态
-    setProjects(prev =>
-      prev.map(p =>
-        p.id === projectId
-          ? { ...p, images: [...p.images, tempImage] }
-          : p
-      )
-    )
-    
     try {
-      // 发送到后端
-      const response = await apiClient.addImageToProject(projectId, file, prompt)
+      // 发送到后端，等待真实数据返回
+      const newImage = await apiClient.addImageToProject(projectId, file, prompt);
       
-      // 释放 blob URL
-      URL.revokeObjectURL(blobUrl)
+      // 直接触发一次状态重载，而不是乐观更新
+      // 这确保了在后续操作（如添加到分组）之前，状态是与后端完全同步的
+      await loadProjects();
       
-      // 后端返回后，用真实数据替换临时数据
-      setProjects(prev =>
-        prev.map(p =>
-          p.id === projectId
-            ? {
-                ...p,
-                images: p.images.map(img =>
-                  img.id === tempId
-                    ? { 
-                        id: response.id, 
-                        filename: response.filename,
-                        mime: response.mime,
-                        prompt: response.prompt,
-                        addedAt: response.addedAt,
-                        updatedAt: response.updatedAt,
-                        isOptimistic: false
-                      }
-                    : img
-                )
-              }
-            : p
-        )
-      )
-      
-      console.log('✓ 图片已保存，等待文件系统同步...')
-      return response.id
+      console.log('✓ 图片已保存，项目状态已同步');
+      return newImage; // 返回完整的图片对象
     } catch (error) {
-      // 失败时移除乐观更新并释放 blob URL
-      URL.revokeObjectURL(blobUrl)
-      setProjects(prev =>
-        prev.map(p =>
-          p.id === projectId
-            ? { ...p, images: p.images.filter(img => img.id !== tempId) }
-            : p
-        )
-      )
-      console.error('添加图片失败:', error)
-      throw error
+      console.error('添加图片失败:', error);
+      throw error;
     }
   }
 
@@ -362,36 +305,39 @@ export function ProjectProvider({ children }) {
         .filter(g => g.pageNum !== null)
         .sort((a, b) => a.pageNum - b.pageNum);
 
-      let insertIndex = pageGroups.length;
+      let insertIndex = 0; // Default to inserting at the beginning
       if (afterGroupId) {
         const afterGroupIndex = pageGroups.findIndex(g => g.id === afterGroupId);
         if (afterGroupIndex !== -1) {
           insertIndex = afterGroupIndex + 1;
         }
+      } else if (afterGroupId === null) {
+        // Explicitly handle insertion at the start
+        insertIndex = 0;
+      } else {
+        // If afterGroupId is undefined, insert at the end
+        insertIndex = pageGroups.length;
       }
       
       const newGroupTitle = `第 ${insertIndex + 1} 页`;
 
-      // Create the new group first
-      const newGroup = await apiClient.createImageGroup(projectId, newGroupTitle, '');
-
-      // Then, renumber all groups that should come after the new group
-      const updates = [];
-      for (let i = insertIndex; i < pageGroups.length; i++) {
-        updates.push({
-          groupId: pageGroups[i].id,
-          updates: { title: `第 ${i + 2} 页` }
-        });
-      }
-
-      if (updates.length > 0) {
-        console.log('✓ 插入新分组后，正在重新排序后续分组...');
-        for (const u of updates) {
-          await apiClient.updateImageGroup(projectId, u.groupId, u.updates);
+      // 1. First, make space by renumbering existing groups that come after the insertion point.
+      // We must do this in reverse order to avoid conflicts.
+      const groupsToUpdate = pageGroups.slice(insertIndex);
+      if (groupsToUpdate.length > 0) {
+        console.log('✓ 为新分组腾出空间，正在反向重命名...');
+        for (let i = groupsToUpdate.length - 1; i >= 0; i--) {
+          const group = groupsToUpdate[i];
+          const newPageNum = group.pageNum + 1;
+          await apiClient.updateImageGroup(projectId, group.id, { title: `第 ${newPageNum} 页` });
         }
       }
 
-      // Manually trigger a state refresh
+      // 2. Now that space has been made, create the new group in the gap.
+      console.log(`✓ 正在创建新分组: ${newGroupTitle}`);
+      const newGroup = await apiClient.createImageGroup(projectId, newGroupTitle, '');
+
+      // 3. Manually trigger a state refresh to get the final consistent state.
       loadProjects();
       return newGroup;
 
