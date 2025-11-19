@@ -14,6 +14,7 @@ export function ImageCard({
 }) {
   const { getImageUrl } = useProjects()
   const [copySuccess, setCopySuccess] = useState(false)
+  const [copyImageSuccess, setCopyImageSuccess] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [imageError, setImageError] = useState(false)
 
@@ -30,6 +31,26 @@ export function ImageCard({
       setTimeout(() => setCopySuccess(false), 2000)
     } catch (err) {
       console.error('复制失败:', err)
+    }
+  }
+
+  const handleCopyImage = async () => {
+    if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      alert('当前浏览器暂不支持复制图片')
+      return
+    }
+
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ])
+      setCopyImageSuccess(true)
+      setTimeout(() => setCopyImageSuccess(false), 2000)
+    } catch (err) {
+      console.error('复制图片失败:', err)
+      alert('复制图片失败，请稍后再试')
     }
   }
 
@@ -84,6 +105,15 @@ export function ImageCard({
             onError={() => setImageError(true)}
           />
         )}
+
+        <button
+          className={`image-card__copy-image-btn ${copyImageSuccess ? 'copied' : ''}`}
+          onClick={handleCopyImage}
+          title={copyImageSuccess ? '已复制图片' : '复制图片'}
+          type="button"
+        >
+          {copyImageSuccess ? '✓' : '⧉'}
+        </button>
         
         {/* 乐观更新指示器 */}
         {image.isOptimistic && (

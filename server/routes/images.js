@@ -84,6 +84,10 @@ router.post('/:projectId', upload.single('image'), async (req, res) => {
     await saveProjects(projects);
     console.log(`✓ 图片 ${filename} 已添加到项目数据库`);
 
+    broadcast({ type: 'projects-updated' });
+
+
+
     res.json({
       success: true,
       image: newImage
@@ -115,6 +119,15 @@ router.put('/:projectId/:imageId', async (req, res) => {
     await fs.writeFile(promptPath, prompt || '', 'utf-8');
     console.log(`📝 Prompt 已更新 ${imageId}.txt`);
     
+    const image = (project.images || []).find(img => img.id === imageId);
+    if (image) {
+      image.prompt = prompt || '';
+      image.updatedAt = new Date().toISOString();
+    }
+
+    await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
+
     res.json({ success: true });
   } catch (error) {
     console.error('更新 prompt 失败:', error);
@@ -126,50 +139,58 @@ router.put('/:projectId/:imageId', async (req, res) => {
 router.delete('/:projectId/:imageId', async (req, res) => {
   try {
     const { projectId, imageId } = req.params;
-    
+
     const projects = await loadProjects();
     const project = projects.find(p => p.id === projectId);
-    
+
     if (!project) {
       return res.status(404).json({ error: '项目不存在' });
     }
-    
+
     if (!project.folderPath) {
       return res.status(400).json({ error: '项目未绑定文件夹' });
     }
-    
+
+    if (!project.images) {
+      project.images = [];
+    }
+
     const image = project.images.find(img => img.id === imageId);
     if (!image) {
       return res.status(404).json({ error: '图片不存在' });
     }
-    
+
     const imagePath = path.join(project.folderPath, image.filename);
     const promptPath = path.join(project.folderPath, `${imageId}.txt`);
-    
-    // 删除文件
+
     await fs.unlink(imagePath).catch(() => {});
     await fs.unlink(promptPath).catch(() => {});
-    
-    // 从所有分组中移除该图片的引用
+
     if (project.imageGroups) {
       project.imageGroups.forEach(group => {
         if (group.imageIds && group.imageIds.includes(imageId)) {
           group.imageIds = group.imageIds.filter(id => id !== imageId);
           group.updatedAt = new Date().toISOString();
-          console.log(`✓ 从分组 ${group.title} 移除已删除的图片 ${imageId}`);
+          console.log(`从分组 ${group.title} 移除了图片 ${imageId}`);
         }
       });
-      await saveProjects(projects);
     }
-    
+
+    project.images = project.images.filter(img => img.id !== imageId);
+    await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
+
     console.log(`🗑️ 图片已删除 ${image.filename}`);
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('删除图片失败:', error);
     res.status(500).json({ error: '删除图片失败' });
   }
 });
+
+// PUT /api/images/:projectId/:imageId/mosaic - 保存马赛克结果
+// PUT /api/images/:projectId/:imageId/mosaic - 保存马赛克结果
 
 // PUT /api/images/:projectId/:imageId/mosaic - 保存马赛克结果
 router.put('/:projectId/:imageId/mosaic', upload.single('image'), async (req, res) => {

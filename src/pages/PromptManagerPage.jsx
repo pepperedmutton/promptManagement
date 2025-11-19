@@ -6,7 +6,8 @@ import { ImageGroup } from '../components/ImageGroup'
 import { GroupSelector } from '../components/GroupSelector'
 import { Button } from '../components/Button'
 import { extractPngMetadata, extractPromptFromMetadata } from '../utils/pngMetadata'
-import { parsePageText, hasPageMarkers, getPageCount, normalizeGroupTitle } from '../utils/textParser'
+import { parsePageText, hasPageMarkers, normalizeGroupTitle } from '../utils/textParser'
+import { useDragScroll } from '../hooks/useDragScroll'
 import '../components/Button.css'
 import './PromptManagerPage.css'
 
@@ -24,7 +25,8 @@ export function PromptManagerPage() {
     insertImageGroup,
     updateImageGroup,
     deleteImageGroup,
-    addImageToGroup
+    addImageToGroup,
+    removeImageFromGroup
   } = useProjects()
 
   const project = getProject(projectId)
@@ -34,43 +36,71 @@ export function PromptManagerPage() {
   const [draggingImageId, setDraggingImageId] = useState(null)
   const [showInsertSelector, setShowInsertSelector] = useState(false);
   const [hoveredGroupId, setHoveredGroupId] = useState(null);
+  useDragScroll(Boolean(draggingImageId))
 
-  // 计算分组显示的数据
+  // 计算分组显示的数据
   const { groups, ungroupedImages } = useMemo(() => {
     if (!project) return { groups: [], ungroupedImages: [] }
 
     const imageGroups = project.imageGroups || []
-    const allImages = project.images || []
-    
-    // 获取所有已分组的图片ID
-    const groupedImageIds = new Set()
-    imageGroups.forEach(group => {
-      (group.imageIds || []).forEach(id => groupedImageIds.add(id))
-    })
-    
-    // 为每个分组附加完整的图片对象
-    const groupsWithImages = imageGroups.map(group => ({
-      ...group,
-      images: (group.imageIds || [])
-        .map(id => allImages.find(img => img.id === id))
-        .filter(Boolean) // 过滤掉不存在的图片
-    }))
-    
-    // 未分组的图片
-    const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
-    
-    // Sort groups by page number
-    const sortedGroups = groupsWithImages
-      .map(g => ({ ...g, pageNum: parseInt((g.title.match(/第 (\d+) 页/) || [])[1], 10) }))
-      .filter(g => !isNaN(g.pageNum))
-      .sort((a, b) => a.pageNum - b.pageNum);
-
+    const allImages = project.images || []
+    
+    // 获取所有已分组的图片ID
+    const groupedImageIds = new Set()
+    imageGroups.forEach(group => {
+      (group.imageIds || []).forEach(id => groupedImageIds.add(id))
+    })
+    
+    // 为每个分组附加完整的图片对象
+    const groupsWithImages = imageGroups.map(group => ({
+      ...group,
+      images: (group.imageIds || [])
+        .map(id => allImages.find(img => img.id === id))
+        .filter(Boolean) // 过滤掉不存在的图像
+    }))
+    
+    // 未分组的图片
+    const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
+    
     return {
-      groups: sortedGroups,
+      groups: groupsWithImages,
       ungroupedImages: ungrouped
     }
   }, [project])
 
+  const referenceGroup = useMemo(() => ({
+    id: 'ungrouped',
+    title: '设定集',
+    description: '这里暂存所有还没有分组的素材，拖拽到右侧分组即可整理。',
+    images: ungroupedImages
+  }), [ungroupedImages])
+
+  const displayGroups = useMemo(() => {
+    return [referenceGroup, ...groups].map((group, index) => ({
+      ...group,
+      metaBackground: index % 2 === 0 ? 'image-group--bg-primary' : 'image-group--bg-secondary'
+    }))
+  }, [referenceGroup, groups])
+
+  const moveGroupOptions = useMemo(() => {
+    return [
+      ...groups,
+      {
+        id: 'ungrouped',
+        title: '移出当前分组',
+        description: '将图片移到未分组区域',
+        images: ungroupedImages
+      }
+    ]
+  }, [groups, ungroupedImages])
+
+  const findGroupContainingImage = useCallback((imageId) => {
+    if (!project?.imageGroups) return null
+    return project.imageGroups.find(group =>
+      (group.imageIds || []).includes(imageId)
+    ) || null
+  }, [project])
+
   // 添加图片并尝试读取 PNG metadata
   const addImageWithMetadata = useCallback(async (file) => {
     // 先提取 PNG metadata（如果是PNG文件）
@@ -255,18 +285,48 @@ export function PromptManagerPage() {
   }
 
   const handleSelectGroup = async (groupId) => {
+
     if (selectedImageId) {
+
       try {
-        await addImageToGroup(projectId, groupId, selectedImageId)
-        console.log(`✓ 图片已移动到分组`)
+
+        if (groupId === 'ungrouped') {
+
+          const currentGroup = findGroupContainingImage(selectedImageId)
+
+          if (currentGroup) {
+
+            await removeImageFromGroup(projectId, currentGroup.id, selectedImageId)
+
+            console.log('图片已移出分组')
+
+          }
+
+        } else {
+
+          await addImageToGroup(projectId, groupId, selectedImageId)
+
+          console.log('图片已移动到分组')
+
+        }
+
         setShowGroupSelector(false)
+
         setSelectedImageId(null)
+
       } catch (error) {
+
         console.error('移动图片失败:', error)
+
         alert('移动图片失败，请重试')
+
       }
+
     }
+
   }
+
+
 
   const handleDragStart = (e, imageId) => {
     e.dataTransfer.effectAllowed = 'move'
@@ -279,13 +339,43 @@ export function PromptManagerPage() {
   }
 
   const handleDrop = async (groupId, imageId) => {
+
+    if (!imageId) return
+
+
+
     try {
-      await addImageToGroup(projectId, groupId, imageId)
-      console.log(`✓ 图片已拖拽到分组`)
+
+      if (groupId === 'ungrouped') {
+
+        const currentGroup = findGroupContainingImage(imageId)
+
+        if (!currentGroup) return
+
+        await removeImageFromGroup(projectId, currentGroup.id, imageId)
+
+        console.log('图片已移出分组')
+
+      } else {
+
+        const currentGroup = findGroupContainingImage(imageId)
+
+        if (currentGroup?.id === groupId) return
+
+        await addImageToGroup(projectId, groupId, imageId)
+
+        console.log('图片已拖拽到分组')
+
+      }
+
     } catch (error) {
+
       console.error('移动图片失败:', error)
+
       alert('移动图片失败，请重试')
+
     }
+
   }
 
   // 处理txt文件导入
@@ -453,13 +543,15 @@ export function PromptManagerPage() {
         ) : (
           <div className="image-gallery">
             {/* 显示所有分组 */}
-            {groups.map(group => (
+            {displayGroups.map(group => {
+              const isReferenceGroup = group.id === 'ungrouped'
+              return (
               <ImageGroup
                 key={group.id}
                 group={group}
                 projectId={projectId}
-                onUpdateGroup={handleUpdateGroup}
-                onDeleteGroup={handleDeleteGroup}
+                onUpdateGroup={isReferenceGroup ? () => {} : handleUpdateGroup}
+                onDeleteGroup={isReferenceGroup ? () => {} : handleDeleteGroup}
                 onPromptChange={handlePromptChange}
                 onDeleteImage={handleDeleteImage}
                 onMoveToGroup={handleMoveToGroup}
@@ -470,30 +562,7 @@ export function PromptManagerPage() {
                 onMouseEnter={() => setHoveredGroupId(group.id)}
                 onMouseLeave={() => setHoveredGroupId(null)}
               />
-            ))}
-            
-            {/* 未分组的图片 */}
-            {ungroupedImages.length > 0 && (
-              <ImageGroup
-                group={{
-                  id: 'ungrouped',
-                  title: '未分组的图片',
-                  description: '这些图片还未添加到任何分组中。你可以将它们拖拽到上面的分组，或使用菜单移动。',
-                  images: ungroupedImages
-                }}
-                projectId={projectId}
-                onUpdateGroup={() => {}}
-                onDeleteGroup={() => {}}
-                onPromptChange={handlePromptChange}
-                onDeleteImage={handleDeleteImage}
-                onMoveToGroup={handleMoveToGroup}
-                draggable={true}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onMouseEnter={() => setHoveredGroupId('ungrouped')}
-                onMouseLeave={() => setHoveredGroupId(null)}
-              />
-            )}
+            )})}
           </div>
         )}
       </main>
@@ -501,7 +570,7 @@ export function PromptManagerPage() {
       {/* 分组选择对话框 */}
       {showGroupSelector && (
         <GroupSelector
-          groups={groups}
+          groups={moveGroupOptions}
           onSelect={handleSelectGroup}
           onClose={() => {
             setShowGroupSelector(false)

@@ -44,6 +44,7 @@ router.post('/', async (req, res) => {
     await saveProjects(projects);
     
     broadcast({ type: 'project-created', project: newProject });
+    broadcast({ type: 'projects-updated' });
     res.json(newProject);
   } catch (error) {
     console.error('创建项目失败:', error);
@@ -97,6 +98,7 @@ router.post('/open-folder', async (req, res) => {
     }
     
     broadcast({ type: 'project-created', project: newProject });
+    broadcast({ type: 'projects-updated' });
     res.json(newProject);
   } catch (error) {
     console.error('打开文件夹失败:', error);
@@ -128,6 +130,7 @@ router.put('/:id', async (req, res) => {
     await saveProjects(projects);
     
     broadcast({ type: 'project-updated', project });
+    broadcast({ type: 'projects-updated' });
     res.json(project);
   } catch (error) {
     console.error('更新项目失败:', error);
@@ -151,6 +154,7 @@ router.delete('/:id', async (req, res) => {
     await saveProjects(projects);
     
     broadcast({ type: 'project-deleted', projectId: id });
+    broadcast({ type: 'projects-updated' });
     res.json({ success: true });
   } catch (error) {
     console.error('删除项目失败:', error);

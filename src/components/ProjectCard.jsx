@@ -1,12 +1,17 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { formatDate, getTimeAgo } from '../utils/helpers'
+import { getTimeAgo } from '../utils/helpers'
 import { Button } from './Button'
+import { useProjects } from '../contexts/ProjectContext'
 import './ProjectCard.css'
 
 export function ProjectCard({ project, onDelete }) {
   const navigate = useNavigate()
+  const { getImageUrl } = useProjects()
   const imageCount = project.images?.length || 0
+  const previewImages = (project.images || [])
+    .filter(img => img.filename)
+    .slice(0, 3)
 
   const handleOpen = () => {
     navigate(`/projects/${project.id}`)
@@ -54,11 +59,18 @@ export function ProjectCard({ project, onDelete }) {
       <div className="project-card__preview">
         {imageCount > 0 ? (
           <div className="project-card__images">
-            {project.images.slice(0, 3).map(img => (
-              <div key={img.id} className="project-card__image">
-                <img src={img.url} alt="" />
-              </div>
-            ))}
+            {previewImages.map(img => {
+              const previewSrc = getImageUrl(
+                project.id,
+                img.filename,
+                img.updatedAt || img.addedAt || ''
+              )
+              return (
+                <div key={img.id} className="project-card__image">
+                  <img src={previewSrc} alt="" />
+                </div>
+              )
+            })}
             {imageCount > 3 && (
               <div className="project-card__image project-card__image--more">
                 +{imageCount - 3}

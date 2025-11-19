@@ -186,11 +186,11 @@ class ApiClient {
   }
 
   // 创建图片分组
-  async createImageGroup(projectId, title = '', description = '') {
+  async createImageGroup(projectId, title = '', description = '', insertIndex = null) {
     const response = await fetch(`${API_BASE}/projects/${projectId}/groups`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description })
+      body: JSON.stringify({ title, description, insertIndex })
     });
     if (!response.ok) throw new Error('创建分组失败');
     return response.json();

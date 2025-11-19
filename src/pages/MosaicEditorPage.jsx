@@ -11,6 +11,7 @@ export function MosaicEditorPage() {
   const { getProject, getImageUrl } = useProjects()
   const project = getProject(projectId)
   const images = project?.images || []
+  const imageGroups = project?.imageGroups || []
 
   const [selectedImageId, setSelectedImageId] = useState(routeImageId || images[0]?.id || null)
   const [intensity, setIntensity] = useState(24)
@@ -29,6 +30,36 @@ export function MosaicEditorPage() {
     () => images.find(img => img.id === selectedImageId) || null,
     [images, selectedImageId]
   )
+
+  const groupedThumbnails = useMemo(() => {
+    if (!images.length) return []
+
+    const groupedIds = new Set()
+
+    const groupsWithImages = imageGroups.map(group => {
+      const populatedImages = (group.imageIds || [])
+        .map(id => images.find(img => img.id === id))
+        .filter(Boolean)
+      populatedImages.forEach(img => groupedIds.add(img.id))
+
+      return {
+        id: group.id,
+        title: group.title || '未命名分组',
+        images: populatedImages
+      }
+    }).filter(group => group.images.length > 0)
+
+    const ungrouped = images.filter(img => !groupedIds.has(img.id))
+    if (ungrouped.length > 0) {
+      groupsWithImages.push({
+        id: 'ungrouped',
+        title: '未分组',
+        images: ungrouped
+      })
+    }
+
+    return groupsWithImages
+  }, [images, imageGroups])
 
   // 同步 URL 参数与选中图片
   useEffect(() => {
@@ -363,21 +394,35 @@ export function MosaicEditorPage() {
         <aside className="mosaic-editor__sidebar">
           <h2>项目图片</h2>
           <div className="mosaic-editor__thumbnails">
-            {images.map(image => {
-              const version = image.updatedAt || image.addedAt || ''
-              const thumbUrl = getImageUrl(projectId, image.filename, version)
-              const isActive = image.id === selectedImageId
-              return (
-                <button
-                  key={image.id}
-                  className={`mosaic-editor__thumbnail ${isActive ? 'is-active' : ''}`}
-                  onClick={() => handleSelectImage(image)}
-                >
-                  <img src={thumbUrl} alt={image.filename} />
-                  <span className="mosaic-editor__thumbnail-name">{image.filename}</span>
-                </button>
-              )
-            })}
+            {groupedThumbnails.length === 0 ? (
+              <div className="mosaic-editor__thumbnail-empty">暂无图片</div>
+            ) : (
+              groupedThumbnails.map(group => (
+                <div key={group.id} className="mosaic-editor__thumbnail-group">
+                  <div className="mosaic-editor__thumbnail-group-title">
+                    <span>{group.title}</span>
+                    <span className="mosaic-editor__thumbnail-count">{group.images.length}</span>
+                  </div>
+                  <div className="mosaic-editor__thumbnail-grid">
+                    {group.images.map(image => {
+                      const version = image.updatedAt || image.addedAt || ''
+                      const thumbUrl = getImageUrl(projectId, image.filename, version)
+                      const isActive = image.id === selectedImageId
+                      return (
+                        <button
+                          key={image.id}
+                          className={`mosaic-editor__thumbnail ${isActive ? 'is-active' : ''}`}
+                          onClick={() => handleSelectImage(image)}
+                        >
+                          <img src={thumbUrl} alt={image.filename} />
+                          <span className="mosaic-editor__thumbnail-name">{image.filename}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </aside>
       </div>

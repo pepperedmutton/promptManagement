@@ -1,5 +1,6 @@
 const express = require('express');
 const { loadProjects, saveProjects } = require('../services/storage');
+const { broadcast } = require('../services/websocket');
 const { normalizeGroupTitle } = require('../utils/textUtils');
 
 const router = express.Router();
@@ -8,7 +9,7 @@ const router = express.Router();
 router.post('/:projectId/groups', async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { title, description } = req.body;
+    const { title, description, insertIndex } = req.body;
     
     const projects = await loadProjects();
     const project = projects.find(p => p.id === projectId);
@@ -41,8 +42,13 @@ router.post('/:projectId/groups', async (req, res) => {
       updatedAt: new Date().toISOString()
     };
     
-    project.imageGroups.push(newGroup);
+    const insertPosition = Number.isInteger(insertIndex)
+      ? Math.max(0, Math.min(insertIndex, project.imageGroups.length))
+      : project.imageGroups.length;
+
+    project.imageGroups.splice(insertPosition, 0, newGroup);
     await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
     
     console.log(`✓ 创建分组: ${newGroup.title}`);
     res.json(newGroup);
@@ -93,6 +99,7 @@ router.put('/:projectId/groups/:groupId', async (req, res) => {
     };
     
     await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
     
     console.log(`✓ 更新分组: ${project.imageGroups[groupIndex].title}`);
     res.json(project.imageGroups[groupIndex]);
@@ -125,6 +132,7 @@ router.delete('/:projectId/groups/:groupId', async (req, res) => {
     
     project.imageGroups = project.imageGroups.filter(g => g.id !== groupId);
     await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
     
     console.log(`✓ 删除分组: ${group.title}`);
     res.json({ success: true });
@@ -179,6 +187,7 @@ router.post('/:projectId/groups/:groupId/images', async (req, res) => {
     }
     
     await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
     res.json({ success: true });
   } catch (error) {
     console.error('添加图片到分组失败:', error);
@@ -210,6 +219,7 @@ router.delete('/:projectId/groups/:groupId/images/:imageId', async (req, res) =>
     group.imageIds = group.imageIds.filter(id => id !== imageId);
     group.updatedAt = new Date().toISOString();
     await saveProjects(projects);
+    broadcast({ type: 'projects-updated' });
     
     console.log(`✓ 从分组 ${group.title} 移除图片 ${imageId}`);
     res.json({ success: true });

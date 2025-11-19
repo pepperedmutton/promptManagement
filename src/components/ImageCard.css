@@ -7,6 +7,7 @@
   display: flex;
   flex-direction: column;
   cursor: move;
+  height: 100%;
 }
 
 .image-card:hover {
@@ -87,15 +88,20 @@
 .image-card__wrapper {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: 150px;
   overflow: hidden;
   background: var(--color-gray-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .image-card__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .image-card__placeholder {
@@ -114,6 +120,39 @@
   position: absolute;
   top: var(--spacing-sm);
   left: var(--spacing-sm);
+}
+
+.image-card__copy-image-btn {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.image-card__copy-image-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
+}
+
+.image-card__copy-image-btn:active {
+  transform: translateY(0);
+}
+
+.image-card__copy-image-btn.copied {
+  background: var(--color-success);
+  color: white;
 }
 
 .image-card__menu-btn {
@@ -192,10 +231,10 @@
 }
 
 .image-card__prompt-section {
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
 }
 
 .image-card__header {
@@ -208,7 +247,7 @@
 .image-card__label {
   font-weight: 600;
   color: var(--color-primary);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .image-card__copy-btn {
@@ -217,7 +256,7 @@
   color: white;
   border: none;
   border-radius: var(--radius-md);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -253,11 +292,11 @@
 
 .image-card__textarea {
   width: 100%;
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
   border: 2px solid var(--color-gray-200);
   border-radius: var(--radius-md);
   font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   resize: vertical;
   transition: border-color var(--transition-fast);
   line-height: 1.5;

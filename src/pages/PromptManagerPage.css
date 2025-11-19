@@ -1,7 +1,7 @@
 .prompt-manager-page {
   min-height: 100vh;
   padding: var(--spacing-xl);
-  /* 移除最大宽度限制，让内容填满整个页面 */
+  background: #0b0e1a;
   margin: 0;
 }
 

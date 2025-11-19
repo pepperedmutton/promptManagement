@@ -295,58 +295,96 @@ export function ProjectProvider({ children }) {
   }
 
   // 在指定位置插入分组
+
   const insertImageGroup = async (projectId, afterGroupId) => {
+
     try {
+
       const project = projects.find(p => p.id === projectId);
+
       if (!project) throw new Error('Project not found');
 
-      const pageGroups = (project.imageGroups || [])
-        .map(g => ({ ...g, pageNum: getPageNumber(g.title) }))
-        .filter(g => g.pageNum !== null)
-        .sort((a, b) => a.pageNum - b.pageNum);
 
-      let insertIndex = 0; // Default to inserting at the beginning
-      if (afterGroupId) {
-        const afterGroupIndex = pageGroups.findIndex(g => g.id === afterGroupId);
-        if (afterGroupIndex !== -1) {
-          insertIndex = afterGroupIndex + 1;
-        }
-      } else if (afterGroupId === null) {
-        // Explicitly handle insertion at the start
+
+      const existingGroups = [...(project.imageGroups || [])];
+
+      let insertIndex = existingGroups.length;
+
+
+
+      if (afterGroupId === null) {
+
         insertIndex = 0;
-      } else {
-        // If afterGroupId is undefined, insert at the end
-        insertIndex = pageGroups.length;
-      }
-      
-      const newGroupTitle = `第 ${insertIndex + 1} 页`;
 
-      // 1. First, make space by renumbering existing groups that come after the insertion point.
-      // We must do this in reverse order to avoid conflicts.
-      const groupsToUpdate = pageGroups.slice(insertIndex);
-      if (groupsToUpdate.length > 0) {
-        console.log('✓ 为新分组腾出空间，正在反向重命名...');
-        for (let i = groupsToUpdate.length - 1; i >= 0; i--) {
-          const group = groupsToUpdate[i];
-          const newPageNum = group.pageNum + 1;
-          await apiClient.updateImageGroup(projectId, group.id, { title: `第 ${newPageNum} 页` });
-        }
+      } else if (afterGroupId) {
+
+        const afterGroupIndex = existingGroups.findIndex(g => g.id === afterGroupId);
+
+        insertIndex = afterGroupIndex === -1 ? existingGroups.length : afterGroupIndex + 1;
+
       }
 
-      // 2. Now that space has been made, create the new group in the gap.
-      console.log(`✓ 正在创建新分组: ${newGroupTitle}`);
-      const newGroup = await apiClient.createImageGroup(projectId, newGroupTitle, '');
 
-      // 3. Manually trigger a state refresh to get the final consistent state.
+
+      const normalizedTitles = new Set(
+
+        existingGroups.map(g => normalizeGroupTitle(g.title || ''))
+
+      );
+
+
+
+      let pageNumber = insertIndex + 1;
+      let newGroupTitle = `第 ${pageNumber} 页`;
+
+      if (normalizedTitles.has(normalizeGroupTitle(newGroupTitle))) {
+        let suffix = 2;
+        let fallbackTitle = '新分组';
+        let candidate = fallbackTitle;
+
+        while (normalizedTitles.has(normalizeGroupTitle(candidate))) {
+          candidate = `${fallbackTitle} ${suffix}`;
+          suffix += 1;
+        }
+
+        newGroupTitle = candidate;
+      }
+
+      console.log(`➕ 正在创建新分组: ${newGroupTitle}（插入位置 ${insertIndex}）`);
+
+      const newGroup = await apiClient.createImageGroup(
+
+        projectId,
+
+        newGroupTitle,
+
+        '',
+
+        insertIndex
+
+      );
+
+
+
       loadProjects();
+
       return newGroup;
 
+
+
     } catch (error) {
+
       console.error('插入分组失败:', error);
-      loadProjects(); // Ensure consistency on error
+
+      loadProjects();
+
       throw error;
+
     }
+
   };
+
+
 
   // 创建图片分组
   const createImageGroup = async (projectId, title = '', description = '') => {

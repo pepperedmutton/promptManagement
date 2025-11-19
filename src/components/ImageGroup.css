@@ -3,15 +3,22 @@
   flex-direction: column;
   gap: var(--spacing-lg);
   padding: var(--spacing-xl);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(20, 24, 41, 0.9);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all var(--transition-smooth);
 }
 
 .image-group:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(30, 36, 62, 0.95);
   border-color: rgba(255, 255, 255, 0.2);
+}
+.image-group--bg-primary {
+  background: #151a2c;
+}
+
+.image-group--bg-secondary {
+  background: #1d2234;
 }
 
 .image-group--drag-over {
@@ -22,18 +29,19 @@
 }
 
 .image-group__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: var(--spacing-md);
+  row-gap: var(--spacing-sm);
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-md);
 }
 
 .image-group__title-section {
-  flex: 1;
-  min-width: 0;
+  display: contents;
 }
 
 .image-group__title {
+  grid-column: 1;
   font-size: 1.5rem;
   font-weight: 700;
   color: white;
@@ -63,17 +71,18 @@
 }
 
 .image-group__description {
+  grid-column: 1 / -1;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
+  width: 100%;
+  box-sizing: border-box;
   color: rgba(255, 255, 255, 0.9);
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
-  font-size: 0.95rem;
-  max-height: 300px;
-  overflow-y: auto;
+  font-size: 0.77rem;
   transition: all var(--transition-fast);
 }
 
@@ -84,25 +93,9 @@
   box-shadow: 0 0 0 3px rgba(140, 111, 247, 0.2);
 }
 
-.image-group__description::-webkit-scrollbar {
-  width: 8px;
-}
-
-.image-group__description::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-sm);
-}
-
-.image-group__description::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-sm);
-}
-
-.image-group__description::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
 .image-group__actions {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   gap: var(--spacing-sm);
   align-items: flex-start;
@@ -147,9 +140,12 @@
 
 .image-group__content {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: var(--spacing-lg);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--spacing-md);
   animation: fadeIn var(--transition-base);
+  background: rgba(0, 0, 0, 0.2);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
 }
 
 .image-group__content.collapsed {
@@ -186,5 +182,23 @@
   .image-group__actions {
     width: 100%;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 1400px) {
+  .image-group__content {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .image-group__content {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .image-group__content {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
