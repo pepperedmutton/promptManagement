@@ -41,7 +41,8 @@ class Debouncer {
       console.log('🚀 Executing pending function after unlock.');
       const funcToRun = this.pendingExecution;
       this.pendingExecution = null;
-      this.trigger(funcToRun);
+      // 延迟一段时间后再执行，给文件系统时间稳定，防止数据竞争
+      setTimeout(() => this.trigger(funcToRun), 100);
     }
   }
 }

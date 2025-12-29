@@ -38,30 +38,50 @@ export function PromptManagerPage() {
   const [hoveredGroupId, setHoveredGroupId] = useState(null);
   useDragScroll(Boolean(draggingImageId))
 
-  // 计算分组显示的数据
+  // 计算分组显示的数据
+
   const { groups, ungroupedImages } = useMemo(() => {
     if (!project) return { groups: [], ungroupedImages: [] }
 
     const imageGroups = project.imageGroups || []
-    const allImages = project.images || []
-    
-    // 获取所有已分组的图片ID
-    const groupedImageIds = new Set()
-    imageGroups.forEach(group => {
-      (group.imageIds || []).forEach(id => groupedImageIds.add(id))
-    })
-    
-    // 为每个分组附加完整的图片对象
-    const groupsWithImages = imageGroups.map(group => ({
-      ...group,
-      images: (group.imageIds || [])
-        .map(id => allImages.find(img => img.id === id))
-        .filter(Boolean) // 过滤掉不存在的图像
-    }))
-    
-    // 未分组的图片
-    const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
-    
+    const allImages = project.images || []
+
+    
+
+    // 获取所有已分组的图片ID
+
+    const groupedImageIds = new Set()
+
+    imageGroups.forEach(group => {
+
+      (group.imageIds || []).forEach(id => groupedImageIds.add(id))
+
+    })
+
+    
+
+    // 为每个分组附加完整的图片对象
+
+    const groupsWithImages = imageGroups.map(group => ({
+
+      ...group,
+
+      images: (group.imageIds || [])
+
+        .map(id => allImages.find(img => img.id === id))
+
+        .filter(Boolean) // 过滤掉不存在的图像
+
+    }))
+
+    
+
+    // 未分组的图片
+
+    const ungrouped = allImages.filter(img => !groupedImageIds.has(img.id))
+
+    
+
     return {
       groups: groupsWithImages,
       ungroupedImages: ungrouped
@@ -81,26 +101,46 @@ export function PromptManagerPage() {
       metaBackground: index % 2 === 0 ? 'image-group--bg-primary' : 'image-group--bg-secondary'
     }))
   }, [referenceGroup, groups])
-
-  const moveGroupOptions = useMemo(() => {
-    return [
-      ...groups,
-      {
-        id: 'ungrouped',
-        title: '移出当前分组',
-        description: '将图片移到未分组区域',
-        images: ungroupedImages
-      }
-    ]
-  }, [groups, ungroupedImages])
-
-  const findGroupContainingImage = useCallback((imageId) => {
-    if (!project?.imageGroups) return null
-    return project.imageGroups.find(group =>
-      (group.imageIds || []).includes(imageId)
-    ) || null
-  }, [project])
-
+
+
+  const moveGroupOptions = useMemo(() => {
+
+    return [
+
+      ...groups,
+
+      {
+
+        id: 'ungrouped',
+
+        title: '移出当前分组',
+
+        description: '将图片移到未分组区域',
+
+        images: ungroupedImages
+
+      }
+
+    ]
+
+  }, [groups, ungroupedImages])
+
+
+
+  const findGroupContainingImage = useCallback((imageId) => {
+
+    if (!project?.imageGroups) return null
+
+    return project.imageGroups.find(group =>
+
+      (group.imageIds || []).includes(imageId)
+
+    ) || null
+
+  }, [project])
+
+
+
   // 添加图片并尝试读取 PNG metadata
   const addImageWithMetadata = useCallback(async (file) => {
     // 先提取 PNG metadata（如果是PNG文件）
@@ -137,6 +177,15 @@ export function PromptManagerPage() {
   // Ctrl+Z 撤销快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 检查事件目标是否在文本输入框中编辑中文
+      const target = e.target
+      const isTextInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+      
+      // 如果是文本输入框且正在进行中文组合输入，则忽略快捷键
+      if (isTextInput && target.closest && target.closest('[data-composing="true"]')) {
+        return
+      }
+      
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && canUndo) {
         e.preventDefault()
         undo()

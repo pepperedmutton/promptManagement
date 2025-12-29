@@ -118,6 +118,11 @@ async function performSync() {
         continue;
       }
       
+      // 初始化 imageGroups 如果不存在
+      if (!project.imageGroups) {
+        project.imageGroups = [];
+      }
+      
       const files = await fs.readdir(project.folderPath);
       const imageFiles = files.filter(f => /\.(jpg|jpeg|png|gif|webp)$/i.test(f));
       
@@ -159,6 +164,18 @@ async function performSync() {
       
       if (imagesToRemove.length > 0) {
         project.images = project.images.filter(img => !imagesToRemove.includes(img.id));
+        
+        // 同时从分组中移除这些图片的引用
+        for (const group of project.imageGroups) {
+          if (group.imageIds) {
+            const beforeCount = group.imageIds.length;
+            group.imageIds = group.imageIds.filter(id => !imagesToRemove.includes(id));
+            if (group.imageIds.length < beforeCount) {
+              hasChanges = true;
+            }
+          }
+        }
+        
         hasChanges = true;
         console.log(`✓ 移除已删除的图片: ${imagesToRemove.length} 个`);
       }

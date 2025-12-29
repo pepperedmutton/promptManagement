@@ -31,6 +31,13 @@ export function MosaicEditorPage() {
     [images, selectedImageId]
   )
 
+  // 全局按文件名排序的图片列表（自然数值排序），用于翻页逻辑
+  const sortedImages = useMemo(() => {
+    return [...images].sort((a, b) =>
+      a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+    )
+  }, [images])
+
   const groupedThumbnails = useMemo(() => {
     if (!images.length) return []
 
@@ -42,6 +49,11 @@ export function MosaicEditorPage() {
         .filter(Boolean)
       populatedImages.forEach(img => groupedIds.add(img.id))
 
+      // 按文件名进行自然排序（数字按数值顺序），遵从版本号序列规范
+      populatedImages.sort((a, b) =>
+        a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+      )
+
       return {
         id: group.id,
         title: group.title || '未命名分组',
@@ -49,7 +61,9 @@ export function MosaicEditorPage() {
       }
     }).filter(group => group.images.length > 0)
 
-    const ungrouped = images.filter(img => !groupedIds.has(img.id))
+    const ungrouped = images
+      .filter(img => !groupedIds.has(img.id))
+      .sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' }))
     if (ungrouped.length > 0) {
       groupsWithImages.push({
         id: 'ungrouped',
@@ -133,6 +147,10 @@ export function MosaicEditorPage() {
     img.onload = () => {
       canvas.width = img.width
       canvas.height = img.height
+      // 禁用平滑缩放以保持像素化效果
+      ctx.imageSmoothingEnabled = false
+      if (ctx.mozImageSmoothingEnabled !== undefined) ctx.mozImageSmoothingEnabled = false
+      if (ctx.webkitImageSmoothingEnabled !== undefined) ctx.webkitImageSmoothingEnabled = false
       ctx.drawImage(img, 0, 0)
       baseImageRef.current = img
       setLoadingImage(false)
@@ -164,6 +182,9 @@ export function MosaicEditorPage() {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
+    // 确保绘图时不进行平滑插值，保持方块感
+    ctx.imageSmoothingEnabled = false
+
     const rect = canvas.getBoundingClientRect()
     const scaleX = canvas.width / rect.width
     const scaleY = canvas.height / rect.height
@@ -171,15 +192,17 @@ export function MosaicEditorPage() {
     const y = (event.clientY - rect.top) * scaleY
     const size = Math.max(4, intensity)
 
-    const startX = Math.max(0, Math.floor(x - size / 2))
-    const startY = Math.max(0, Math.floor(y - size / 2))
-    const endX = Math.min(canvas.width, Math.floor(x + size / 2))
-    const endY = Math.min(canvas.height, Math.floor(y + size / 2))
+    // 将起止坐标对齐到网格，这样每次应用都会填充同一套方块，避免平滑叠加
+    const startX = Math.max(0, Math.floor((x - size / 2) / size) * size)
+    const startY = Math.max(0, Math.floor((y - size / 2) / size) * size)
+    const endX = Math.min(canvas.width, Math.ceil((x + size / 2) / size) * size)
+    const endY = Math.min(canvas.height, Math.ceil((y + size / 2) / size) * size)
 
     for (let yy = startY; yy < endY; yy += size) {
       for (let xx = startX; xx < endX; xx += size) {
-        const blockW = Math.min(size, endX - xx)
-        const blockH = Math.min(size, endY - yy)
+        const blockW = Math.min(size, canvas.width - xx)
+        const blockH = Math.min(size, canvas.height - yy)
+        // 使用 getImageData 获取该块的色值并计算平均值
         const imageData = ctx.getImageData(xx, yy, blockW, blockH)
         const data = imageData.data
         if (data.length === 0) continue
@@ -241,7 +264,7 @@ export function MosaicEditorPage() {
   }
 
   const handleSave = async () => {
-    if (!selectedImage || !hasChanges) return
+    if (!selectedImage || !hasChanges) return true
     try {
       setIsSaving(true)
       showStatus('正在保存...', 'info')
@@ -250,9 +273,11 @@ export function MosaicEditorPage() {
       setHasChanges(false)
       setLocalVersion(result.updatedAt || Date.now().toString())
       showStatus('马赛克已保存', 'success')
+      return true
     } catch (error) {
       console.error('保存马赛克失败:', error)
       showStatus('保存失败，请重试', 'error')
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -263,20 +288,28 @@ export function MosaicEditorPage() {
     navigate(`/projects/${projectId}/mosaic/${image.id}`, { replace: true })
   }
 
-  const handlePreviousImage = () => {
+  const handlePreviousImage = async () => {
     if (images.length <= 1) return
-    const currentIndex = images.findIndex(img => img.id === selectedImageId)
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : images.length - 1
-    const prevImage = images[prevIndex]
+    // 自动保存当前改动
+    const saved = await handleSave()
+    if (!saved) return // 保存失败则中止切换
+
+  const currentIndex = sortedImages.findIndex(img => img.id === selectedImageId)
+  const prevIndex = currentIndex > 0 ? currentIndex - 1 : sortedImages.length - 1
+  const prevImage = sortedImages[prevIndex]
     setSelectedImageId(prevImage.id)
     navigate(`/projects/${projectId}/mosaic/${prevImage.id}`, { replace: true })
   }
 
-  const handleNextImage = () => {
+  const handleNextImage = async () => {
     if (images.length <= 1) return
-    const currentIndex = images.findIndex(img => img.id === selectedImageId)
-    const nextIndex = currentIndex < images.length - 1 ? currentIndex + 1 : 0
-    const nextImage = images[nextIndex]
+    // 自动保存当前改动
+    const saved = await handleSave()
+    if (!saved) return // 保存失败则中止切换
+
+  const currentIndex = sortedImages.findIndex(img => img.id === selectedImageId)
+  const nextIndex = currentIndex < sortedImages.length - 1 ? currentIndex + 1 : 0
+  const nextImage = sortedImages[nextIndex]
     setSelectedImageId(nextImage.id)
     navigate(`/projects/${projectId}/mosaic/${nextImage.id}`, { replace: true })
   }

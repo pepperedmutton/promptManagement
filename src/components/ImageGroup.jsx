@@ -21,15 +21,45 @@ export function ImageGroup({
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isEditingDesc, setIsEditingDesc] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
+  const [localDescription, setLocalDescription] = useState(group.description || '')
   const descriptionAreaRef = useRef(null)
+  const descriptionTimerRef = useRef(null)
+
+  // 同步外部 group.description 到本地状态
+  useEffect(() => {
+    setLocalDescription(group.description || '')
+  }, [group.description])
 
   const handleTitleChange = (e) => {
     onUpdateGroup(group.id, { ...group, title: e.target.value })
   }
 
   const handleDescriptionChange = (e) => {
-    onUpdateGroup(group.id, { ...group, description: e.target.value })
+    const newValue = e.target.value
+    
+    // 立即更新本地状态（UI 响应）
+    setLocalDescription(newValue)
+    
+    // 清除之前的定时器
+    if (descriptionTimerRef.current) {
+      clearTimeout(descriptionTimerRef.current)
+    }
+    
+    // 延迟 500ms 后再发送 API 请求
+    descriptionTimerRef.current = setTimeout(() => {
+      onUpdateGroup(group.id, { ...group, description: newValue })
+    }, 500)
   }
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (descriptionTimerRef.current) {
+        clearTimeout(descriptionTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleDelete = () => {
     const confirmed = window.confirm(
@@ -68,7 +98,7 @@ export function ImageGroup({
       textarea.style.height = 'auto'
       textarea.style.height = `${textarea.scrollHeight}px`
     }
-  }, [isEditingDesc, group.description])
+  }, [isEditingDesc, localDescription])
 
   const groupBgClass = group.metaBackground || ''
   const shouldShowDescription = isEditingDesc || !isCollapsed
@@ -92,8 +122,11 @@ export function ImageGroup({
                 onChange={handleTitleChange}
                 onBlur={() => setIsEditingTitle(false)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') setIsEditingTitle(false)
+                  // 只在非组合输入状态下处理 Enter 键（兼容中文输入法）
+                  if (e.key === 'Enter' && !isComposing) setIsEditingTitle(false)
                 }}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 autoFocus
                 placeholder="Enter a group title..."
               />
@@ -113,9 +146,29 @@ export function ImageGroup({
               <textarea
                 ref={descriptionAreaRef}
                 className="image-group__description"
-                value={group.description || ''}
+                value={localDescription}
                 onChange={handleDescriptionChange}
-                onBlur={() => setIsEditingDesc(false)}
+                onBlur={() => {
+                  setIsEditingDesc(false)
+                  // 编辑完成时立即保存（如果还有未保存的更改）
+                  if (descriptionTimerRef.current) {
+                    clearTimeout(descriptionTimerRef.current)
+                    onUpdateGroup(group.id, { ...group, description: localDescription })
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Ctrl/Cmd + Enter 完成编辑，但只在非组合输入状态下处理
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !isComposing) {
+                    setIsEditingDesc(false)
+                    // 立即保存
+                    if (descriptionTimerRef.current) {
+                      clearTimeout(descriptionTimerRef.current)
+                      onUpdateGroup(group.id, { ...group, description: localDescription })
+                    }
+                  }
+                }}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 rows={1}
                 placeholder={`Add a short description...
 
